@@ -60,6 +60,11 @@ chmod +x backend nodeclient 2>/dev/null || true
 
 echo -e "${YELLOW}[3/6] 配置域名和密码...${NC}"
 read -p "请输入面板域名 (如 panel.example.com): " DOMAIN
+USE_HTTPS="y"
+if [ -n "$DOMAIN" ] && ! [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  read -p "启用 HTTPS (Let's Encrypt)? (Y/n) 选n则仅HTTP，可用于套CDN回源: " USE_HTTPS
+  USE_HTTPS="${USE_HTTPS:-y}"
+fi
 read -p "设置管理员密码 (留空默认 admin123): " ADMIN_PWD
 ADMIN_PWD="${ADMIN_PWD:-admin123}"
 
@@ -75,6 +80,17 @@ if [ -z "$DOMAIN" ] || [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   try_files {path} /index.html
   file_server
   reverse_proxy /api/* 127.0.0.1:18888
+}
+CADDYEOF
+elif [ "$USE_HTTPS" = "n" ]; then
+  cat > caddy/Caddyfile << CADDYEOF
+${DOMAIN}:80 {
+  root * /opt/backend/public
+  try_files {path} /index.html
+  file_server
+  reverse_proxy /api/* 127.0.0.1:18888 {
+    header_up X-Real-IP {http.request.header.CF-Connecting-IP}
+  }
 }
 CADDYEOF
 else
@@ -131,21 +147,25 @@ echo -e "${YELLOW}[6/6] 启动服务...${NC}"
 docker compose up -d
 
 PROTO="https://"
-[ -z "$DOMAIN" ] || [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && PROTO="http://"
+ADDR="${DOMAIN}"
+if [ -z "$DOMAIN" ] || [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  PROTO="http://"
+  ADDR="${DOMAIN:-$(curl -fsSL ifconfig.me)}"
+elif [ "$USE_HTTPS" = "n" ]; then
+  PROTO="http://"
+fi
 echo ""
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  安装完成!${NC}"
-echo -e "${GREEN}  面板地址: ${PROTO}${DOMAIN:-$(curl -fsSL ifconfig.me)}${NC}"
+echo -e "${GREEN}  面板地址: ${PROTO}${ADDR}${NC}"
 echo -e "${GREEN}  管理员: admin${NC}"
 echo -e "${GREEN}  密码: ${ADMIN_PWD}${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
-if [ -n "$DOMAIN" ] && ! [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "请确保域名 ${DOMAIN} 已解析到本机 IP"
-fi
-echo ""
+NODE_PROTO="https://"
+[ "$USE_HTTPS" = "n" ] || [ -z "$DOMAIN" ] || [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && NODE_PROTO="http://"
 echo "节点客户端安装命令 (在入口机运行):"
 echo -e "  ${YELLOW}curl -fL https://github.com/${REPO}/releases/latest/download/nodeclient-linux-\$(uname -m).tar.gz -o /tmp/nc.tar.gz && tar xzf /tmp/nc.tar.gz -C /usr/local/bin/ && chmod +x /usr/local/bin/nodeclient${NC}"
 echo ""
 echo "对接入口机:"
-echo -e "  ${YELLOW}nodeclient --server https://${DOMAIN} --token <节点令牌> --device <设备组ID>${NC}"
+echo -e "  ${YELLOW}nodeclient --server ${NODE_PROTO}${ADDR} --token <节点令牌> --device <设备组ID>${NC}"
