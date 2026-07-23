@@ -48,7 +48,7 @@ const Nodes: React.FC = () => {
       const deviceGroupId = prompt('请输入设备组ID:')
       if (!deviceGroupId) { setRegistering(false); return }
       const res = await registerNode({ name, device_group_id: parseInt(deviceGroupId) })
-      setToken(res.data?.token || res.token || '')
+      setToken(res.data?.token || '')
       setTokenModalOpen(true)
     } catch {
       message.error('注册节点失败')

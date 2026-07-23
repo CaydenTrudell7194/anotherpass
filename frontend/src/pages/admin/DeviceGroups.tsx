@@ -119,8 +119,8 @@ const DeviceGroups: React.FC = () => {
       title: '已用流量',
       key: 'traffic',
       render: (_: any, record: DeviceGroup) => (
-        <Tooltip title={formatBytes(record.traffic_used || record.traffic || 0)}>
-          <span>{formatBytes(record.traffic_used || record.traffic || 0)}</span>
+        <Tooltip title={formatBytes(record.traffic_used || 0)}>
+          <span>{formatBytes(record.traffic_used || 0)}</span>
         </Tooltip>
       ),
     },

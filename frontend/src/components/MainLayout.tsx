@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Button, Dropdown, Avatar, theme, Switch } from 'antd'
+import { Layout, Menu, Button, Dropdown, Avatar, Switch } from 'antd'
+import type { MenuProps } from 'antd'
 import {
   HomeOutlined, UserOutlined, UnorderedListOutlined, DesktopOutlined,
   ApiOutlined, DashboardOutlined, SettingOutlined, TeamOutlined,
@@ -10,8 +11,8 @@ import { getProfile } from '../api'
 
 const { Header, Sider, Content } = Layout
 
-const menuItems = (isAdmin: boolean) => {
-  const items = [
+const menuItems = (isAdmin: boolean): MenuProps['items'] => {
+  const items: MenuProps['items'] = [
     { key: '/', icon: <HomeOutlined />, label: '主页' },
     { key: '/profile', icon: <UserOutlined />, label: '个人中心' },
     { key: '/forward_rules', icon: <UnorderedListOutlined />, label: '转发规则' },
@@ -27,8 +28,8 @@ const menuItems = (isAdmin: boolean) => {
         { key: '/admin/user_groups', icon: <TeamOutlined />, label: '用户组管理' },
         { key: '/admin/device_groups', icon: <CloudServerOutlined />, label: '设备组管理' },
         { key: '/admin/nodes', icon: <ApiOutlined />, label: '节点管理' },
-      ]
-    })
+      ],
+    } as MenuProps['items'][number])
   }
   return items
 }
