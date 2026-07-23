@@ -1,0 +1,118 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build Backend (${{ matrix.arch }})
+        run: |
+          cd backend
+          go mod tidy
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            GOARCH=arm64 CGO_ENABLED=1 go build -o ../build/backend-linux-arm64 ./cmd/
+          else
+            GOARCH=amd64 CGO_ENABLED=1 go build -o ../build/backend-linux-amd64 ./cmd/
+          fi
+
+      - name: Build Node Client (${{ matrix.arch }})
+        run: |
+          cd nodeclient
+          go mod tidy
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            GOARCH=arm64 CGO_ENABLED=0 go build -o ../build/nodeclient-linux-arm64 .
+          else
+            GOARCH=amd64 CGO_ENABLED=0 go build -o ../build/nodeclient-linux-amd64 .
+          fi
+
+      - name: Build Frontend
+        run: |
+          cd frontend
+          npm install
+          npm run build
+          cp -r dist ../build/public
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: forward-panel-${{ matrix.arch }}
+          path: build/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Create Release Archive
+        run: |
+          mkdir -p release
+
+          # 独立 nodeclient (amd64)
+          cp artifacts/forward-panel-amd64/nodeclient-linux-amd64 release/nodeclient
+          cd release && tar czf ../nodeclient-linux-amd64.tar.gz nodeclient && rm -rf *
+          cd ${{ github.workspace }}
+
+          # 独立 nodeclient (arm64)
+          cp artifacts/forward-panel-arm64/nodeclient-linux-arm64 release/nodeclient
+          cd release && tar czf ../nodeclient-linux-arm64.tar.gz nodeclient && rm -rf *
+          cd ${{ github.workspace }}
+
+          # 完整面板包 (amd64)
+          cp artifacts/forward-panel-amd64/backend-linux-amd64 release/
+          cp artifacts/forward-panel-amd64/nodeclient-linux-amd64 release/
+          cp -r artifacts/forward-panel-amd64/public release/
+          cd release && tar czf ../forward-panel-linux-amd64.tar.gz * && rm -rf *
+          cd ${{ github.workspace }}
+
+          # 完整面板包 (arm64)
+          cp artifacts/forward-panel-arm64/backend-linux-arm64 release/
+          cp artifacts/forward-panel-arm64/nodeclient-linux-arm64 release/
+          cp -r artifacts/forward-panel-arm64/public release/
+          cd release && tar czf ../forward-panel-linux-arm64.tar.gz * && rm -rf *
+          cd ${{ github.workspace }}
+
+          # 全平台合集
+          cp artifacts/forward-panel-amd64/backend-linux-amd64 release/
+          cp artifacts/forward-panel-amd64/nodeclient-linux-amd64 release/
+          cp artifacts/forward-panel-arm64/backend-linux-arm64 release/
+          cp artifacts/forward-panel-arm64/nodeclient-linux-arm64 release/
+          cp -r artifacts/forward-panel-amd64/public release/
+          cp ${{ github.workspace }}/deploy/install.sh release/
+          cp ${{ github.workspace }}/deploy/forward-panel.service release/
+          cd release && tar czf ../forward-panel-all.tar.gz *
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            forward-panel-linux-amd64.tar.gz
+            forward-panel-linux-arm64.tar.gz
+            forward-panel-all.tar.gz
+            nodeclient-linux-amd64.tar.gz
+            nodeclient-linux-arm64.tar.gz
+          generate_release_notes: true
