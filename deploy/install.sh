@@ -87,7 +87,7 @@ cat > docker-compose.yml << DOCKEREOF
 version: '3.8'
 services:
   backend:
-    image: alpine:3.19
+    image: debian:bookworm-slim
     network_mode: host
     restart: always
     volumes:
