@@ -120,4 +120,3 @@ jobs:
             forward-panel-all.tar.gz
             nodeclient-linux-amd64.tar.gz
             nodeclient-linux-arm64.tar.gz
-          generate_release_notes: true

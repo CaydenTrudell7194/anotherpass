@@ -6,6 +6,7 @@ frontend/dist/
 
 # Build output
 build/
+build_log*.txt
 
 # Database
 *.db
