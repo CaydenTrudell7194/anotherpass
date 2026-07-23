@@ -46,7 +46,7 @@ func Login(c *gin.Context) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, _ := token.SignedString(middleware.JWTSecret)
-	c.JSON(http.StatusOK, gin.H{"token": tokenStr, "user": user})
+	c.JSON(http.StatusOK, gin.H{"token": tokenStr})
 }
 
 func GetProfile(c *gin.Context) {

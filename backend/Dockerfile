@@ -1,8 +1,8 @@
 FROM golang:1.21-alpine AS builder
 RUN apk add --no-cache gcc musl-dev
 WORKDIR /build
-COPY go.mod go.sum* ./
-RUN go mod tidy 2>/dev/null || go mod download
+COPY go.mod ./
+RUN go mod tidy
 COPY . .
 RUN CGO_ENABLED=1 go build -o backend ./cmd/
 

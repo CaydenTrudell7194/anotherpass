@@ -67,21 +67,48 @@ func UpdateUser(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
 		return
 	}
-	var updated model.User
-	if err := c.ShouldBindJSON(&updated); err != nil {
+	var input struct {
+		Username     *string `json:"username"`
+		Password     *string `json:"password"`
+		DisplayName  *string `json:"display_name"`
+		UserGroupID  *uint   `json:"user_group_id"`
+		Status       *string `json:"status"`
+		TrafficLimit *int64  `json:"traffic_limit"`
+		RuleLimit    *int    `json:"rule_limit"`
+		IsAdmin      *bool   `json:"is_admin"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
 	}
-	updated.ID = user.ID
-	updated.Password = user.Password
-	updated.CreatedAt = user.CreatedAt
-	updated.UpdatedAt = time.Now()
-	if updated.Password != "" && updated.Password != user.Password {
-		hash, _ := bcrypt.GenerateFromPassword([]byte(updated.Password), bcrypt.DefaultCost)
-		updated.Password = string(hash)
+	if input.Username != nil {
+		user.Username = *input.Username
 	}
-	model.DB.Save(&updated)
-	c.JSON(http.StatusOK, updated)
+	if input.Password != nil && *input.Password != "" {
+		hash, _ := bcrypt.GenerateFromPassword([]byte(*input.Password), bcrypt.DefaultCost)
+		user.Password = string(hash)
+	}
+	if input.DisplayName != nil {
+		user.DisplayName = *input.DisplayName
+	}
+	if input.UserGroupID != nil {
+		user.UserGroupID = *input.UserGroupID
+	}
+	if input.Status != nil {
+		user.Status = *input.Status
+	}
+	if input.TrafficLimit != nil {
+		user.TrafficLimit = *input.TrafficLimit
+	}
+	if input.RuleLimit != nil {
+		user.RuleLimit = *input.RuleLimit
+	}
+	if input.IsAdmin != nil {
+		user.IsAdmin = *input.IsAdmin
+	}
+	user.UpdatedAt = time.Now()
+	model.DB.Save(&user)
+	c.JSON(http.StatusOK, user)
 }
 
 func DeleteUser(c *gin.Context) {
@@ -116,11 +143,20 @@ func UpdateUserGroup(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "用户组不存在"})
 		return
 	}
-	if err := c.ShouldBindJSON(&group); err != nil {
+	var input struct {
+		Name        *string `json:"name"`
+		Description *string `json:"description"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
 	}
-	group.ID = uint(id)
+	if input.Name != nil {
+		group.Name = *input.Name
+	}
+	if input.Description != nil {
+		group.Description = *input.Description
+	}
 	model.DB.Save(&group)
 	c.JSON(http.StatusOK, group)
 }

@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card, Row, Col, Statistic, Descriptions, Tag, Spin, message } from 'antd'
-import {
-  UserOutlined, UnorderedListOutlined, ApiOutlined,
-  TeamOutlined, ThunderboltOutlined, ClockCircleOutlined
-} from '@ant-design/icons'
+import { UserOutlined, UnorderedListOutlined, ApiOutlined } from '@ant-design/icons'
 import { getProfile, listForwardRules, listMyDeviceGroups } from '../../api'
 
 export default function Home() {
