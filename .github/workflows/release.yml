@@ -71,21 +71,32 @@ jobs:
       - name: Create Release Archive
         run: |
           mkdir -p release
-          # amd64
+
+          # 独立 nodeclient (amd64)
+          cp artifacts/forward-panel-amd64/nodeclient-linux-amd64 release/nodeclient
+          cd release && tar czf ../nodeclient-linux-amd64.tar.gz nodeclient && rm -rf *
+          cd ${{ github.workspace }}
+
+          # 独立 nodeclient (arm64)
+          cp artifacts/forward-panel-arm64/nodeclient-linux-arm64 release/nodeclient
+          cd release && tar czf ../nodeclient-linux-arm64.tar.gz nodeclient && rm -rf *
+          cd ${{ github.workspace }}
+
+          # 完整面板包 (amd64)
           cp artifacts/forward-panel-amd64/backend-linux-amd64 release/
           cp artifacts/forward-panel-amd64/nodeclient-linux-amd64 release/
           cp -r artifacts/forward-panel-amd64/public release/
-          cd release && tar czf ../forward-panel-linux-amd64.tar.gz *
-          rm -rf release/*
+          cd release && tar czf ../forward-panel-linux-amd64.tar.gz * && rm -rf *
+          cd ${{ github.workspace }}
 
-          # arm64
+          # 完整面板包 (arm64)
           cp artifacts/forward-panel-arm64/backend-linux-arm64 release/
           cp artifacts/forward-panel-arm64/nodeclient-linux-arm64 release/
           cp -r artifacts/forward-panel-arm64/public release/
-          cd release && tar czf ../forward-panel-linux-arm64.tar.gz *
-          rm -rf release/*
+          cd release && tar czf ../forward-panel-linux-arm64.tar.gz * && rm -rf *
+          cd ${{ github.workspace }}
 
-          # Combined
+          # 全平台合集
           cp artifacts/forward-panel-amd64/backend-linux-amd64 release/
           cp artifacts/forward-panel-amd64/nodeclient-linux-amd64 release/
           cp artifacts/forward-panel-arm64/backend-linux-arm64 release/
@@ -102,4 +113,6 @@ jobs:
             forward-panel-linux-amd64.tar.gz
             forward-panel-linux-arm64.tar.gz
             forward-panel-all.tar.gz
+            nodeclient-linux-amd64.tar.gz
+            nodeclient-linux-arm64.tar.gz
           generate_release_notes: true

@@ -1,11 +1,11 @@
 #!/bin/bash
 #
 # 转发面板 - 一键安装脚本
-# 用法: bash <(curl -fsSL https://raw.githubusercontent.com/你的用户名/转发面板/main/deploy/install.sh)
+# 用法: bash <(curl -fsSL https://raw.githubusercontent.com/CaydenTrudell7194/anotherpass/main/deploy/install.sh)
 #
 set -e
 
-REPO="你的用户名/转发面板"
+REPO="CaydenTrudell7194/anotherpass"
 VERSION="${1:-latest}"
 INSTALL_DIR="/opt/forward-panel"
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
