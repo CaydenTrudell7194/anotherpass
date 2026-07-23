@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "18888:18888"
+    environment:
+      - LISTEN=0.0.0.0:18888
+      - DATABASE=sqlite3:///data/data.db
+      - FRONTEND_DIR=/app/public
+    volumes:
+      - panel-data:/data
+    networks:
+      - panel-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - panel-net
+
+volumes:
+  panel-data:
+
+networks:
+  panel-net:
