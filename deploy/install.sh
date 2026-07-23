@@ -68,20 +68,28 @@ MIGRATE=1 ADMIN="admin" ./backend 2>/dev/null || true
 
 echo -e "${YELLOW}[5/6] 配置 Caddy 反向代理...${NC}"
 mkdir -p caddy
-cat > caddy/Caddyfile << CADDYEOF
-{
-  servers { protocols h1 h2 }
+if [ -z "$DOMAIN" ] || [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  cat > caddy/Caddyfile << CADDYEOF
+:80 {
+  root * /opt/backend/public
+  try_files {path} /index.html
+  file_server
+  reverse_proxy /api/* 127.0.0.1:18888
 }
+CADDYEOF
+else
+  cat > caddy/Caddyfile << CADDYEOF
 ${DOMAIN} {
   tls admin@${DOMAIN}
-  root * ${INSTALL_DIR}/public
+  root * /opt/backend/public
+  try_files {path} /index.html
   file_server
-  reverse_proxy /api/* http://127.0.0.1:18888 {
-    trusted_proxies 0.0.0.0/0
+  reverse_proxy /api/* 127.0.0.1:18888 {
     header_up X-Real-IP {http.request.header.CF-Connecting-IP}
   }
 }
 CADDYEOF
+fi
 
 cat > docker-compose.yml << DOCKEREOF
 version: '3.8'
@@ -122,15 +130,19 @@ DOCKEREOF
 echo -e "${YELLOW}[6/6] 启动服务...${NC}"
 docker compose up -d
 
+PROTO="https://"
+[ -z "$DOMAIN" ] || [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && PROTO="http://"
 echo ""
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  安装完成!${NC}"
-echo -e "${GREEN}  面板地址: https://${DOMAIN}${NC}"
+echo -e "${GREEN}  面板地址: ${PROTO}${DOMAIN:-$(curl -fsSL ifconfig.me)}${NC}"
 echo -e "${GREEN}  管理员: admin${NC}"
 echo -e "${GREEN}  密码: ${ADMIN_PWD}${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
-echo "请确保域名 ${DOMAIN} 已解析到本机 IP"
+if [ -n "$DOMAIN" ] && ! [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "请确保域名 ${DOMAIN} 已解析到本机 IP"
+fi
 echo ""
 echo "节点客户端安装命令 (在入口机运行):"
 echo -e "  ${YELLOW}curl -fL https://github.com/${REPO}/releases/latest/download/nodeclient-linux-\$(uname -m).tar.gz -o /tmp/nc.tar.gz && tar xzf /tmp/nc.tar.gz -C /usr/local/bin/ && chmod +x /usr/local/bin/nodeclient${NC}"
