@@ -1,0 +1,14 @@
+[Unit]
+Description=Forward Panel Backend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/forward-panel
+ExecStart=/opt/forward-panel/backend
+Restart=always
+RestartSec=5
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

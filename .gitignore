@@ -1,0 +1,37 @@
+# Dependencies
+backend/backend
+nodeclient/nodeclient
+frontend/node_modules/
+frontend/dist/
+
+# Build output
+build/
+
+# Database
+*.db
+*.db-journal
+*.db-wal
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+config.yml
+
+# Browser test artifacts
+.playwright-mcp/
+*.snapshot.md
+login-snapshot.md
+main-snapshot.md
+device-group-user.md
+device-group.md
+forward-rules.md
+user-group.md
