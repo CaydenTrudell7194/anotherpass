@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Descriptions, Tag, Spin, message } from 'antd'
+import { Alert, Card, Row, Col, Statistic, Descriptions, Tag, Spin, message } from 'antd'
 import { UserOutlined, UnorderedListOutlined, ApiOutlined } from '@ant-design/icons'
 import { getProfile, listForwardRules, listMyDeviceGroups } from '../../api'
+import { useSite } from '../../site'
 
 export default function Home() {
   const [user, setUser] = useState<any>(null)
   const [rules, setRules] = useState<any[]>([])
   const [deviceGroups, setDeviceGroups] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const { settings } = useSite()
 
   const fetchData = async () => {
     setLoading(true)
@@ -43,6 +45,7 @@ export default function Home() {
 
   return (
     <div>
+      {settings.site_notice && <Alert message="站点公告" description={<div style={{ whiteSpace: 'pre-wrap' }}>{settings.site_notice}</div>} type="info" showIcon style={{ marginBottom: 16 }} />}
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={16}>
           <Card title={<><UserOutlined /> 用户信息</>}>

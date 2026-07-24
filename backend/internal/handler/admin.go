@@ -257,6 +257,31 @@ func UpdateUserGroup(c *gin.Context) {
 
 func DeleteUserGroup(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
-	model.DB.Delete(&model.UserGroup{}, id)
+	if id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID无效"})
+		return
+	}
+	if LoadSiteSettings().RegisterUserGroupID == uint(id) {
+		c.JSON(http.StatusConflict, gin.H{"error": "该用户组是公开注册默认组，不能删除"})
+		return
+	}
+	var users int64
+	if err := model.DB.Model(&model.User{}).Where("user_group_id = ?", id).Count(&users).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "检查依赖失败"})
+		return
+	}
+	if users > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "该用户组仍有用户，不能删除"})
+		return
+	}
+	result := model.DB.Delete(&model.UserGroup{}, id)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败"})
+		return
+	}
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "用户组不存在"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
 }

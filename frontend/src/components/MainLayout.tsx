@@ -8,6 +8,7 @@ import {
   CloudServerOutlined, LogoutOutlined, MoonOutlined, SunOutlined
 } from '@ant-design/icons'
 import { getProfile } from '../api'
+import { useSite, useSiteBackground } from '../site'
 
 const { Header, Sider, Content } = Layout
 
@@ -24,6 +25,7 @@ const menuItems = (isAdmin: boolean): MenuProps['items'] => {
       key: 'admin', icon: <SettingOutlined />, label: '管理',
       children: [
         { key: '/admin/dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
+        { key: '/admin/settings', icon: <SettingOutlined />, label: '站点设置' },
         { key: '/admin/users', icon: <UserOutlined />, label: '用户管理' },
         { key: '/admin/user_groups', icon: <TeamOutlined />, label: '用户组管理' },
         { key: '/admin/device_groups', icon: <CloudServerOutlined />, label: '设备组管理' },
@@ -40,6 +42,8 @@ export default function MainLayout() {
   const [user, setUser] = useState<any>(null)
   const [collapsed, setCollapsed] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
+  const { settings } = useSite()
+  const background = useSiteBackground()
 
   useEffect(() => {
     getProfile().then(res => setUser(res.data)).catch(() => {})
@@ -57,7 +61,7 @@ export default function MainLayout() {
     <Layout style={{ minHeight: '100vh' }}>
       <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme={darkMode ? 'dark' : 'light'}>
         <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: collapsed ? 14 : 18 }}>
-          {collapsed ? '转' : '转发面板'}
+           {collapsed ? settings.site_name.slice(0, 1) : settings.site_name}
         </div>
         <Menu
           mode="inline"
@@ -87,8 +91,8 @@ export default function MainLayout() {
             </Button>
           </Dropdown>
         </Header>
-        <Content style={{ margin: 24 }}>
-          <Outlet />
+        <Content style={{ padding: 24, ...background }}>
+          <div style={settings.theme_policy === 'transparent' ? { background: 'rgba(255,255,255,.88)', borderRadius: 12, padding: 20, backdropFilter: 'blur(8px)' } : {}}><Outlet /></div>
         </Content>
       </Layout>
     </Layout>

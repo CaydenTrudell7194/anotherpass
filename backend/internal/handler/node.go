@@ -14,7 +14,9 @@ import (
 
 func ListNodeStatus(c *gin.Context) {
 	var nodes []model.Node
-	model.DB.Order("id desc").Find(&nodes)
+	retention := time.Duration(LoadSiteSettings().OfflineNodeRetentionHours) * time.Hour
+	cutoff := time.Now().Add(-retention)
+	model.DB.Where("status = ? OR last_heartbeat >= ? OR (last_heartbeat = ? AND created_at >= ?)", "online", cutoff, time.Time{}, cutoff).Order("id desc").Find(&nodes)
 	c.JSON(http.StatusOK, nodes)
 }
 
@@ -37,7 +39,9 @@ func ListMyNodeStatus(c *gin.Context) {
 	}
 	var nodes []model.Node
 	if len(groupIDs) > 0 {
-		model.DB.Where("device_group_id IN ?", groupIDs).Order("id desc").Find(&nodes)
+		retention := time.Duration(LoadSiteSettings().OfflineNodeRetentionHours) * time.Hour
+		cutoff := time.Now().Add(-retention)
+		model.DB.Where("device_group_id IN ? AND (status = ? OR last_heartbeat >= ? OR (last_heartbeat = ? AND created_at >= ?))", groupIDs, "online", cutoff, time.Time{}, cutoff).Order("id desc").Find(&nodes)
 	}
 	c.JSON(http.StatusOK, nodes)
 }
@@ -102,8 +106,9 @@ func CheckOfflineNodes() {
 	var nodes []model.Node
 	model.DB.Where("status = ?", "online").Find(&nodes)
 	now := time.Now()
+	offlineAfter := time.Duration(LoadSiteSettings().OfflineNodeSeconds) * time.Second
 	for _, n := range nodes {
-		if now.Sub(n.LastHeartbeat) > 90*time.Second {
+		if now.Sub(n.LastHeartbeat) > offlineAfter {
 			model.DB.Model(&n).Update("status", "offline")
 			var count int64
 			model.DB.Model(&model.Node{}).Where("device_group_id = ? AND status = ?", n.DeviceGroupID, "online").Count(&count)

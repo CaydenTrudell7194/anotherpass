@@ -11,6 +11,8 @@ import AdminUsers from './pages/admin/Users'
 import AdminUserGroups from './pages/admin/UserGroups'
 import AdminDeviceGroups from './pages/admin/DeviceGroups'
 import AdminNodes from './pages/admin/Nodes'
+import Register from './pages/Register'
+import AdminSettings from './pages/admin/Settings'
 
 const isLoggedIn = () => !!localStorage.getItem('token')
 
@@ -23,6 +25,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
       <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
         <Route index element={<Home />} />
         <Route path="profile" element={<Profile />} />
@@ -30,6 +33,7 @@ export default function App() {
         <Route path="device_group" element={<DeviceGroups />} />
         <Route path="node_status" element={<NodeStatus />} />
         <Route path="admin/dashboard" element={<AdminDashboard />} />
+        <Route path="admin/settings" element={<AdminSettings />} />
         <Route path="admin/users" element={<AdminUsers />} />
         <Route path="admin/user_groups" element={<AdminUserGroups />} />
         <Route path="admin/device_groups" element={<AdminDeviceGroups />} />

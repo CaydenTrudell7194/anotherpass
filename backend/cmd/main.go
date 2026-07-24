@@ -40,7 +40,7 @@ func main() {
 	go func() {
 		for {
 			handler.CheckOfflineNodes()
-			time.Sleep(60 * time.Second)
+			time.Sleep(10 * time.Second)
 		}
 	}()
 
@@ -63,6 +63,8 @@ func main() {
 	api := r.Group("/api")
 	{
 		api.POST("/login", handler.Login)
+		api.POST("/register", handler.Register)
+		api.GET("/site", handler.PublicSiteSettings)
 
 		auth := api.Group("")
 		auth.Use(middleware.AuthRequired())
@@ -85,6 +87,8 @@ func main() {
 		admin.Use(middleware.AdminRequired())
 		{
 			admin.GET("/dashboard", handler.AdminDashboard)
+			admin.GET("/settings", handler.GetSiteSettings)
+			admin.PUT("/settings", handler.UpdateSiteSettings)
 
 			admin.GET("/users", handler.ListUsers)
 			admin.POST("/users", handler.CreateUser)

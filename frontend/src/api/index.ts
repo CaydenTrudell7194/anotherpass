@@ -26,6 +26,8 @@ export default api
 
 export const login = (username: string, password: string) =>
   api.post('/login', { username, password })
+export const register = (data: { username: string; password: string; display_name?: string }) => api.post('/register', data)
+export const getSiteSettings = () => api.get('/site')
 
 export const getProfile = () => api.get('/profile')
 export const changePassword = (oldPwd: string, newPwd: string) =>
@@ -40,6 +42,8 @@ export const toggleForwardRule = (id: number) => api.put(`/forward_rules/${id}/t
 export const batchCreateRules = (rules: any[]) => api.post('/forward_rules/batch', rules)
 
 export const adminDashboard = () => api.get('/admin/dashboard')
+export const getAdminSettings = () => api.get('/admin/settings')
+export const updateAdminSettings = (data: any) => api.put('/admin/settings', data)
 export const listUsers = () => api.get('/admin/users')
 export const createUser = (data: any) => api.post('/admin/users', data)
 export const updateUser = (id: number, data: any) => api.put(`/admin/users/${id}`, data)
