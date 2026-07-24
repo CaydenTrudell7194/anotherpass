@@ -125,7 +125,9 @@ echo -e "${YELLOW}[4/6] 配置 Caddy 反向代理...${NC}"
 if [ -z "$DOMAIN" ] || is_ip "$DOMAIN"; then
   cat > caddy/Caddyfile << CADDYEOF
 :80 {
-  reverse_proxy /api/* 127.0.0.1:18888
+  handle /api/* {
+    reverse_proxy 127.0.0.1:18888
+  }
   handle {
     root * /srv/public
     try_files {path} /index.html
@@ -136,8 +138,10 @@ CADDYEOF
 elif [ "$USE_HTTPS" = "n" ]; then
   cat > caddy/Caddyfile << CADDYEOF
 ${DOMAIN}:80 {
-  reverse_proxy /api/* 127.0.0.1:18888 {
-    header_up X-Real-IP {http.request.header.CF-Connecting-IP}
+  handle /api/* {
+    reverse_proxy 127.0.0.1:18888 {
+      header_up X-Real-IP {http.request.header.CF-Connecting-IP}
+    }
   }
   handle {
     root * /srv/public
@@ -150,8 +154,10 @@ else
   cat > caddy/Caddyfile << CADDYEOF
 ${DOMAIN} {
   tls admin@${DOMAIN}
-  reverse_proxy /api/* 127.0.0.1:18888 {
-    header_up X-Real-IP {http.request.header.CF-Connecting-IP}
+  handle /api/* {
+    reverse_proxy 127.0.0.1:18888 {
+      header_up X-Real-IP {http.request.header.CF-Connecting-IP}
+    }
   }
   handle {
     root * /srv/public
