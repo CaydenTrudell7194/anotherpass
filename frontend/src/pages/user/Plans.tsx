@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, Col, Empty, Form, Input, Modal, Row, Space, Table, Tag, Typography, message } from 'antd'
-import { CheckCircleOutlined, ShoppingCartOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Col, Empty, Form, Input, InputNumber, Modal, Radio, Row, Space, Table, Tag, Typography, message, Statistic } from 'antd'
+import { CheckCircleOutlined, ShoppingCartOutlined, WalletOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { createOrder, errorMessage, listOrders, listPlans } from '../../api'
+import { createOrder, errorMessage, listOrders, listPlans, getProfile, purchasePlanWithBalance, listRechargeProviders, createRecharge } from '../../api'
 
 interface Plan {
   id: number
@@ -25,6 +25,7 @@ interface Order {
   admin_note: string
   reviewed_at: string | null
   created_at: string
+  payment_method: string
 }
 
 const statusMeta: Record<string, { color: string; text: string }> = {
@@ -42,18 +43,49 @@ export default function Plans() {
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [form] = Form.useForm()
+  const [profile, setProfile] = useState<any>({balance_cents:0})
+  const [balancePlan, setBalancePlan] = useState<Plan | null>(null)
+  const [purchaseKey, setPurchaseKey] = useState('')
+  const [rechargeOpen, setRechargeOpen] = useState(false)
+  const [providers, setProviders] = useState<Record<string,boolean>>({})
+  const [rechargeForm] = Form.useForm()
+  const [rechargeKey, setRechargeKey] = useState('')
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [plansRes, ordersRes] = await Promise.all([listPlans(), listOrders()])
+      const [plansRes, ordersRes, profileRes, providersRes] = await Promise.all([listPlans(), listOrders(), getProfile(), listRechargeProviders()])
       setPlans((plansRes.data || plansRes).filter((plan: Plan) => plan.enabled))
       setOrders(ordersRes.data || ordersRes)
+      setProfile(profileRes.data || {})
+      setProviders(providersRes.data || {})
     } catch (err) {
       message.error(errorMessage(err, '获取套餐和订单失败'))
     } finally {
       setLoading(false)
     }
+  }
+
+  const buyWithBalance = async () => {
+    if (!balancePlan) return
+    try {
+      setSubmitting(true)
+      await purchasePlanWithBalance(balancePlan.id, purchaseKey)
+      message.success('余额购买成功，套餐已立即生效')
+      setBalancePlan(null)
+      await fetchData()
+    } catch (err) { message.error(errorMessage(err, '余额购买失败')) }
+    finally { setSubmitting(false) }
+  }
+
+  const recharge = async () => {
+    try {
+      const values = await rechargeForm.validateFields()
+      setSubmitting(true)
+      const res = await createRecharge({provider:values.provider,amount_cents:Math.round(values.amount_yuan*100)}, rechargeKey)
+      window.location.href = res.data.pay_url
+    } catch (err:any) { if (!err?.errorFields) message.error(errorMessage(err,'创建充值订单失败')) }
+    finally { setSubmitting(false) }
   }
 
   useEffect(() => { fetchData() }, [])
@@ -83,19 +115,15 @@ export default function Plans() {
     { title: '时长', dataIndex: 'plan_duration_days', width: 90, render: (days: number) => `${days} 天` },
     { title: '规则上限', dataIndex: 'plan_rule_limit', width: 100, render: (limit: number) => limit > 0 ? `${limit} 条` : '不限' },
     { title: '状态', dataIndex: 'status', width: 90, render: (status: string) => <Tag color={statusMeta[status]?.color}>{statusMeta[status]?.text || status}</Tag> },
+    { title: '方式', dataIndex: 'payment_method', width: 90, render:(v:string)=>v==='balance'?'余额':'人工' },
     { title: '提交备注', dataIndex: 'user_note', ellipsis: true, render: (note: string) => note || '-' },
     { title: '处理备注', dataIndex: 'admin_note', ellipsis: true, render: (note: string) => note || '-' },
     { title: '创建时间', dataIndex: 'created_at', width: 150, render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm') },
   ]
 
   return <div>
-    <Alert
-      type="info"
-      showIcon
-      style={{ marginBottom: 16 }}
-      message="套餐订单采用人工审核"
-      description="选择套餐并提交申请，套餐将在管理员审核通过后生效。支付功能将在后续版本接入。"
-    />
+    <Card style={{marginBottom:16}}><Row align="middle" justify="space-between"><Col><Statistic title="账户余额" value={(profile.balance_cents||0)/100} precision={2} prefix="¥" /></Col><Col><Button type="primary" icon={<WalletOutlined />} disabled={!Object.values(providers).some(Boolean)} onClick={()=>{setRechargeKey(crypto.randomUUID());setRechargeOpen(true)}}>充值余额</Button></Col></Row></Card>
+    <Alert type="info" showIcon style={{ marginBottom: 16 }} message="余额购买立即生效" description="余额不足时可通过已配置的支付渠道充值；也可以提交人工审核订单。" />
     <Typography.Title level={5} style={{ marginTop: 0 }}>可用套餐</Typography.Title>
     {plans.length === 0 && !loading ? <Empty description="暂无可购买套餐" /> : <Row gutter={[12, 12]}>
       {plans.map(plan => <Col xs={24} sm={12} xl={8} key={plan.id}>
@@ -107,9 +135,7 @@ export default function Plans() {
             <span><CheckCircleOutlined /> {plan.duration_days} 天</span>
             <span><CheckCircleOutlined /> {plan.rule_limit > 0 ? `${plan.rule_limit} 条规则` : '规则不限'}</span>
           </Space>
-          <Button type="primary" block icon={<ShoppingCartOutlined />} onClick={() => { setSelectedPlan(plan); form.resetFields() }}>
-            申请套餐
-          </Button>
+          <Space.Compact block><Button type="primary" icon={<WalletOutlined />} style={{width:'60%'}} onClick={() => {setBalancePlan(plan);setPurchaseKey(crypto.randomUUID())}}>余额购买</Button><Button icon={<ShoppingCartOutlined />} style={{width:'40%'}} onClick={() => { setSelectedPlan(plan); form.resetFields() }}>人工申请</Button></Space.Compact>
         </Card>
       </Col>)}
     </Row>}
@@ -132,6 +158,15 @@ export default function Plans() {
         <Form.Item name="user_note" label="订单备注" rules={[{ max: 500, message: '备注不能超过 500 个字符' }]}>
           <Input.TextArea rows={4} showCount maxLength={500} placeholder="填写需要管理员了解的信息" />
         </Form.Item>
+      </Form>
+    </Modal>
+    <Modal title={`余额购买 - ${balancePlan?.name||''}`} open={!!balancePlan} onCancel={()=>setBalancePlan(null)} onOk={buyWithBalance} okText="确认购买" confirmLoading={submitting} okButtonProps={{disabled:!!balancePlan&&profile.balance_cents<balancePlan.price_cents}}>
+      {balancePlan && <Alert type={profile.balance_cents>=balancePlan.price_cents?'info':'error'} showIcon message={`价格 ${formatPrice(balancePlan.price_cents)}，当前余额 ${formatPrice(profile.balance_cents||0)}`} description={profile.balance_cents>=balancePlan.price_cents?`购买后余额 ${formatPrice(profile.balance_cents-balancePlan.price_cents)}`:'余额不足，请先充值'} />}
+    </Modal>
+    <Modal title="充值余额" open={rechargeOpen} onCancel={()=>setRechargeOpen(false)} onOk={recharge} confirmLoading={submitting}>
+      <Form form={rechargeForm} layout="vertical" preserve={false}>
+        <Form.Item name="amount_yuan" label="充值金额（元）" rules={[{required:true}]}><InputNumber min={1} max={10000000000} precision={2} style={{width:'100%'}} /></Form.Item>
+        <Form.Item name="provider" label="支付渠道" rules={[{required:true}]}><Radio.Group>{providers.epay&&<Radio value="epay">易支付</Radio>}{providers.codepay&&<Radio value="codepay">码支付</Radio>}</Radio.Group></Form.Item>
       </Form>
     </Modal>
   </div>

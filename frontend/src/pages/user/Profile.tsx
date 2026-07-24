@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react'
-import { Card, Form, Input, Button, Descriptions, Tag, message, Spin } from 'antd'
-import { UserOutlined, LockOutlined, KeyOutlined, SaveOutlined } from '@ant-design/icons'
-import { getProfile, changePassword } from '../../api'
+import { Card, Form, Input, Button, Descriptions, Tag, message, Spin, Table } from 'antd'
+import { UserOutlined, LockOutlined, KeyOutlined, SaveOutlined, WalletOutlined } from '@ant-design/icons'
+import { getProfile, changePassword, listBalanceLedger } from '../../api'
 
 export default function Profile() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [changing, setChanging] = useState(false)
   const [form] = Form.useForm()
+  const [ledger, setLedger] = useState<any[]>([])
 
   useEffect(() => {
     getProfile()
       .then(res => setUser(res.data))
       .catch(() => message.error('获取用户信息失败'))
       .finally(() => setLoading(false))
+    listBalanceLedger().then(res=>setLedger(res.data||[])).catch(()=>{})
   }, [])
 
   const handleChangePassword = async (values: { old_password: string; new_password: string; confirm: string }) => {
@@ -46,6 +48,7 @@ export default function Profile() {
           <Descriptions.Item label="角色">
             <Tag color={user?.is_admin ? 'red' : 'blue'}>{user?.is_admin ? '管理员' : '普通用户'}</Tag>
           </Descriptions.Item>
+          <Descriptions.Item label="余额">¥{((user?.balance_cents||0)/100).toFixed(2)}</Descriptions.Item>
           <Descriptions.Item label="过期时间">
             {user?.expire_at ? new Date(user.expire_at).toLocaleDateString() : '永久'}
           </Descriptions.Item>
@@ -53,6 +56,15 @@ export default function Profile() {
             {user?.created_at ? new Date(user.created_at).toLocaleString() : '-'}
           </Descriptions.Item>
         </Descriptions>
+      </Card>
+      <Card title={<><WalletOutlined /> 余额流水</>} style={{marginBottom:16}}>
+        <Table size="small" rowKey="id" pagination={{pageSize:8}} dataSource={ledger} columns={[
+          {title:'时间',dataIndex:'created_at',render:(v:string)=>new Date(v).toLocaleString()},
+          {title:'类型',dataIndex:'kind'},
+          {title:'变动',dataIndex:'delta_cents',render:(v:number)=><Tag color={v>=0?'green':'red'}>{v>=0?'+':''}¥{(v/100).toFixed(2)}</Tag>},
+          {title:'余额',dataIndex:'balance_after_cents',render:(v:number)=>`¥${(v/100).toFixed(2)}`},
+          {title:'备注',dataIndex:'note'}
+        ]}/>
       </Card>
 
       <Card title={<><LockOutlined /> 修改密码</>}>

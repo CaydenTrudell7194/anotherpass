@@ -6,6 +6,19 @@ const (
 	OrderStatusPending  = "pending"
 	OrderStatusApproved = "approved"
 	OrderStatusRejected = "rejected"
+
+	PaymentMethodManual  = "manual"
+	PaymentMethodBalance = "balance"
+
+	LedgerKindOrderDebit      = "order_debit"
+	LedgerKindAdminAdjustment = "admin_adjustment"
+	LedgerKindRecharge        = "recharge"
+
+	RechargeProviderEpay    = "epay"
+	RechargeProviderCodepay = "codepay"
+	RechargeStatusPending   = "pending"
+	RechargeStatusPaid      = "paid"
+	RechargeStatusFailed    = "failed"
 )
 
 type ServicePlan struct {
@@ -35,6 +48,39 @@ type Order struct {
 	AdminNote        string     `gorm:"size:500" json:"admin_note"`
 	ReviewedBy       *uint      `json:"reviewed_by,omitempty"`
 	ReviewedAt       *time.Time `json:"reviewed_at,omitempty"`
+	PaymentMethod    string     `gorm:"size:16;not null;default:manual" json:"payment_method"`
+	PaidCents        int64      `gorm:"not null;default:0" json:"paid_cents"`
+	IdempotencyKey   string     `gorm:"size:128;index" json:"-"`
+	FulfilledAt      *time.Time `json:"fulfilled_at,omitempty"`
 	CreatedAt        time.Time  `gorm:"index" json:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at"`
+}
+
+type BalanceLedger struct {
+	ID                uint      `gorm:"primaryKey" json:"id"`
+	UserID            uint      `gorm:"not null;index" json:"user_id"`
+	DeltaCents        int64     `gorm:"not null" json:"delta_cents"`
+	BalanceAfterCents int64     `gorm:"not null" json:"balance_after_cents"`
+	Kind              string    `gorm:"size:32;not null;index" json:"kind"`
+	OrderID           *uint     `gorm:"index" json:"order_id,omitempty"`
+	ActorUserID       *uint     `gorm:"index" json:"actor_user_id,omitempty"`
+	OperationKey      string    `gorm:"size:128;not null;uniqueIndex" json:"-"`
+	RequestHash       string    `gorm:"size:64;not null" json:"-"`
+	Note              string    `gorm:"size:500;not null" json:"note"`
+	CreatedAt         time.Time `gorm:"not null;index" json:"created_at"`
+}
+
+type RechargeOrder struct {
+	ID              uint       `gorm:"primaryKey" json:"id"`
+	TradeNo         string     `gorm:"size:64;not null;uniqueIndex" json:"trade_no"`
+	UserID          uint       `gorm:"not null;index" json:"user_id"`
+	Provider        string     `gorm:"size:16;not null;index" json:"provider"`
+	AmountCents     int64      `gorm:"not null" json:"amount_cents"`
+	Status          string     `gorm:"size:16;not null;index" json:"status"`
+	ProviderTradeNo string     `gorm:"size:128" json:"provider_trade_no,omitempty"`
+	IdempotencyKey  string     `gorm:"size:128;index" json:"-"`
+	RequestHash     string     `gorm:"size:64" json:"-"`
+	PayURL          string     `gorm:"size:2048" json:"pay_url,omitempty"`
+	CreatedAt       time.Time  `gorm:"not null;index" json:"created_at"`
+	PaidAt          *time.Time `json:"paid_at,omitempty"`
 }

@@ -13,6 +13,14 @@ services:
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - PUBLIC_URL=${PUBLIC_URL:-}
+      - EPAY_GATEWAY=${EPAY_GATEWAY:-}
+      - EPAY_PID=${EPAY_PID:-}
+      - EPAY_KEY=${EPAY_KEY:-}
+      - EPAY_TYPE=${EPAY_TYPE:-alipay}
+      - CODEPAY_CREATE_URL=${CODEPAY_CREATE_URL:-}
+      - CODEPAY_MERCHANT_ID=${CODEPAY_MERCHANT_ID:-}
+      - CODEPAY_KEY=${CODEPAY_KEY:-}
     volumes:
       - panel-data:/data
     networks:

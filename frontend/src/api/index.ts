@@ -77,6 +77,13 @@ export const adminDeletePlan = (id: number) => api.delete(`/admin/plans/${id}`)
 export const adminListOrders = (status?: string) => api.get('/admin/orders', { params: status ? { status } : {} })
 export const adminApproveOrder = (id: number, data: any) => api.post(`/admin/orders/${id}/approve`, data)
 export const adminRejectOrder = (id: number, data: any) => api.post(`/admin/orders/${id}/reject`, data)
+export const purchasePlanWithBalance = (planId: number, key: string) => api.post('/orders/balance', { plan_id: planId }, { headers: { 'Idempotency-Key': key } })
+export const listBalanceLedger = () => api.get('/balance/ledger')
+export const listRechargeProviders = () => api.get('/recharge/providers')
+export const createRecharge = (data: any, key: string) => api.post('/recharge', data, { headers: { 'Idempotency-Key': key } })
+export const listRechargeOrders = () => api.get('/recharge/orders')
+export const adminSetBalance = (userId: number, targetBalanceCents: number, reason: string, key: string) => api.post(`/admin/users/${userId}/balance-adjustments`, { target_balance_cents: targetBalanceCents, reason }, { headers: { 'Idempotency-Key': key } })
+export const adminListBalanceLedger = (userId: number) => api.get(`/admin/users/${userId}/balance-ledger`)
 
 export const nodeHeartbeat = (token: string, ip: string) =>
   api.post('/node/heartbeat', { token, ip })

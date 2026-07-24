@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Table, Button, Modal, Form, Input, InputNumber, Select, DatePicker, Switch, Popconfirm, Space, Progress, Tag, message, Tooltip } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, WalletOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { listUsers, createUser, updateUser, deleteUser, listUserGroups } from '../../api'
+import { listUsers, createUser, updateUser, deleteUser, listUserGroups, adminSetBalance } from '../../api'
 
 interface User {
   id: number
@@ -15,6 +15,7 @@ interface User {
   rule_limit: number
   expire_at: string | null
   created_at: string
+  balance_cents: number
 }
 
 interface UserGroup {
@@ -30,6 +31,8 @@ const Users: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+  const [balanceUser, setBalanceUser] = useState<User | null>(null)
+  const [balanceForm] = Form.useForm()
 
   useEffect(() => {
     fetchUsers()
@@ -116,12 +119,25 @@ const Users: React.FC = () => {
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
+  const setBalance = async () => {
+    if (!balanceUser) return
+    try {
+      const values = await balanceForm.validateFields()
+      setSubmitting(true)
+      await adminSetBalance(balanceUser.id, Math.round(values.balance_yuan * 100), values.reason, crypto.randomUUID())
+      message.success('余额已设置并记录流水')
+      setBalanceUser(null)
+      fetchUsers()
+    } catch (err:any) { if (!err?.errorFields) message.error('余额设置失败') }
+    finally { setSubmitting(false) }
+  }
 
   const columns = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
     { title: '用户名', dataIndex: 'username', key: 'username' },
     { title: '显示名', dataIndex: 'display_name', key: 'display_name' },
     { title: '用户组ID', dataIndex: 'user_group_id', key: 'user_group_id' },
+    { title: '余额', dataIndex: 'balance_cents', render: (v:number) => `¥${((v||0)/100).toFixed(2)}` },
     {
       title: '状态',
       dataIndex: 'status',
@@ -158,6 +174,7 @@ const Users: React.FC = () => {
           <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             编辑
           </Button>
+          <Button type="link" icon={<WalletOutlined />} onClick={() => { setBalanceUser(record); balanceForm.setFieldsValue({balance_yuan:(record.balance_cents||0)/100,reason:''}) }}>设置余额</Button>
           <Popconfirm title="确定删除此用户？" onConfirm={() => handleDelete(record.id)} okText="确定" cancelText="取消">
             <Button type="link" danger icon={<DeleteOutlined />}>
               删除
@@ -223,6 +240,12 @@ const Users: React.FC = () => {
           <Form.Item name="expire_at" label="过期时间">
             <DatePicker showTime style={{ width: '100%' }} />
           </Form.Item>
+        </Form>
+      </Modal>
+      <Modal title={`设置余额 - ${balanceUser?.username||''}`} open={!!balanceUser} onCancel={()=>setBalanceUser(null)} onOk={setBalance} confirmLoading={submitting} destroyOnClose>
+        <Form form={balanceForm} layout="vertical" preserve={false}>
+          <Form.Item name="balance_yuan" label="目标余额（元）" rules={[{required:true}]}><InputNumber min={0} max={10000000000} precision={2} style={{width:'100%'}} /></Form.Item>
+          <Form.Item name="reason" label="调整原因" rules={[{required:true},{max:500}]}><Input.TextArea rows={3} showCount maxLength={500} /></Form.Item>
         </Form>
       </Modal>
     </div>

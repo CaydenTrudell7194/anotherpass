@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +13,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
+
+var errUserHasCommerceHistory = errors.New("user has commerce history")
 
 func AdminDashboard(c *gin.Context) {
 	var userCount, ruleCount, groupCount, nodeCount int64
@@ -167,9 +170,39 @@ func UpdateUser(c *gin.Context) {
 	if input.ExpireAt != nil {
 		user.ExpireAt = *input.ExpireAt
 	}
-	user.UpdatedAt = time.Now()
-	user.TokenVersion++
-	if err := model.DB.Save(&user).Error; err != nil {
+	updates := map[string]interface{}{"updated_at": time.Now(), "token_version": gorm.Expr("token_version + 1")}
+	if input.Username != nil {
+		updates["username"] = user.Username
+	}
+	if input.Password != nil && *input.Password != "" {
+		updates["password"] = user.Password
+	}
+	if input.DisplayName != nil {
+		updates["display_name"] = user.DisplayName
+	}
+	if input.UserGroupID != nil {
+		updates["user_group_id"] = user.UserGroupID
+	}
+	if input.Status != nil {
+		updates["status"] = user.Status
+	}
+	if input.TrafficLimit != nil {
+		updates["traffic_limit"] = user.TrafficLimit
+	}
+	if input.RuleLimit != nil {
+		updates["rule_limit"] = user.RuleLimit
+	}
+	if input.IsAdmin != nil {
+		updates["is_admin"] = user.IsAdmin
+	}
+	if input.ExpireAt != nil {
+		updates["expire_at"] = user.ExpireAt
+	}
+	if err := model.DB.Model(&model.User{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败"})
+		return
+	}
+	if err := model.DB.First(&user, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败"})
 		return
 	}
@@ -188,6 +221,23 @@ func DeleteUser(c *gin.Context) {
 		return
 	}
 	err = model.DB.Transaction(func(tx *gorm.DB) error {
+		var references int64
+		if err := tx.Model(&model.Order{}).Where("user_id = ? OR reviewed_by = ?", id, id).Count(&references).Error; err != nil {
+			return err
+		}
+		if references == 0 {
+			if err := tx.Model(&model.BalanceLedger{}).Where("user_id = ? OR actor_user_id = ?", id, id).Count(&references).Error; err != nil {
+				return err
+			}
+		}
+		if references == 0 {
+			if err := tx.Model(&model.RechargeOrder{}).Where("user_id = ?", id).Count(&references).Error; err != nil {
+				return err
+			}
+		}
+		if references > 0 {
+			return errUserHasCommerceHistory
+		}
 		if err := tx.Where("user_id = ?", id).Delete(&model.ForwardRule{}).Error; err != nil {
 			return err
 		}
@@ -201,6 +251,10 @@ func DeleteUser(c *gin.Context) {
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, errUserHasCommerceHistory) {
+			c.JSON(http.StatusConflict, gin.H{"error": "用户已有订单、充值记录或余额流水，不能删除"})
+			return
+		}
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
 			return

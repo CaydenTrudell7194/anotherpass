@@ -19,6 +19,10 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if err := cfg.ValidatePayments(); err != nil {
+		log.Fatalf("支付配置错误: %v", err)
+	}
+	handler.ConfigurePayments(cfg)
 	if err := middleware.ConfigureJWTSecret(); err != nil {
 		log.Fatalf("安全配置错误: %v", err)
 	}
@@ -65,6 +69,14 @@ func main() {
 		api.POST("/login", handler.Login)
 		api.POST("/register", handler.Register)
 		api.GET("/site", handler.PublicSiteSettings)
+		api.GET("/payment/epay/notify", handler.EpayNotify)
+		api.POST("/payment/epay/notify", handler.EpayNotify)
+		api.GET("/payment/codepay/notify", handler.CodepayNotify)
+		api.POST("/payment/codepay/notify", handler.CodepayNotify)
+		api.GET("/payment/epay/return", handler.PaymentReturn)
+		api.POST("/payment/epay/return", handler.PaymentReturn)
+		api.GET("/payment/codepay/return", handler.PaymentReturn)
+		api.POST("/payment/codepay/return", handler.PaymentReturn)
 
 		auth := api.Group("")
 		auth.Use(middleware.AuthRequired())
@@ -77,6 +89,11 @@ func main() {
 			auth.GET("/plans", handler.ListServicePlans)
 			auth.GET("/orders", handler.ListOrders)
 			auth.POST("/orders", handler.CreateOrder)
+			auth.POST("/orders/balance", handler.CreateBalanceOrder)
+			auth.GET("/balance/ledger", handler.ListBalanceLedger)
+			auth.GET("/recharge/providers", handler.ListRechargeProviders)
+			auth.POST("/recharge", handler.CreateRecharge)
+			auth.GET("/recharge/orders", handler.ListRechargeOrders)
 			auth.GET("/forward_rules", handler.ListForwardRules)
 			auth.POST("/forward_rules", handler.CreateForwardRule)
 			auth.PUT("/forward_rules/:id", handler.UpdateForwardRule)
@@ -97,6 +114,8 @@ func main() {
 			admin.POST("/users", handler.CreateUser)
 			admin.PUT("/users/:id", handler.UpdateUser)
 			admin.DELETE("/users/:id", handler.DeleteUser)
+			admin.POST("/users/:id/balance-adjustments", handler.AdminAdjustBalance)
+			admin.GET("/users/:id/balance-ledger", handler.AdminListBalanceLedger)
 
 			admin.GET("/user_groups", handler.ListUserGroups)
 			admin.POST("/user_groups", handler.CreateUserGroup)

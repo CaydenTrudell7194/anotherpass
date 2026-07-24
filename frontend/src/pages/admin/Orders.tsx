@@ -17,6 +17,8 @@ interface Order {
   reviewed_by?: number
   reviewed_at?: string
   created_at: string
+  payment_method: string
+  paid_cents: number
 }
 
 type StatusFilter = 'pending' | 'approved' | 'rejected' | 'all'
@@ -83,6 +85,8 @@ export default function Orders() {
     { title: '金额', dataIndex: 'plan_price_cents', width: 100, render: formatPrice },
     { title: '权益', key: 'benefit', width: 150, render: (_: unknown, order: Order) => `${order.plan_duration_days} 天 / ${order.plan_rule_limit > 0 ? `${order.plan_rule_limit} 条` : '规则不限'}` },
     { title: '状态', dataIndex: 'status', width: 90, render: (value: string) => <Tag color={statusMeta[value]?.color}>{statusMeta[value]?.text || value}</Tag> },
+    { title: '支付方式', dataIndex: 'payment_method', width: 100, render:(v:string)=>v==='balance'?<Tag color="blue">余额</Tag>:<Tag>人工</Tag> },
+    { title: '实付', dataIndex: 'paid_cents', width: 100, render:formatPrice },
     { title: '用户备注', dataIndex: 'user_note', ellipsis: true, render: (note: string) => note || '-' },
     { title: '审核备注', dataIndex: 'admin_note', ellipsis: true, render: (note: string) => note || '-' },
     { title: '提交时间', dataIndex: 'created_at', width: 150, render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm') },

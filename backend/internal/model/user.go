@@ -15,6 +15,7 @@ type User struct {
 	ExpireAt     time.Time `json:"expire_at"`
 	IsAdmin      bool      `gorm:"default:false" json:"is_admin"`
 	TokenVersion uint      `gorm:"default:1" json:"-"`
+	BalanceCents int64     `gorm:"not null;default:0" json:"balance_cents"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

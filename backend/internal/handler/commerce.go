@@ -82,6 +82,7 @@ func CreateOrder(c *gin.Context) {
 			UserID: userID, PlanID: plan.ID, PlanName: plan.Name, PlanPriceCents: plan.PriceCents,
 			PlanDurationDays: plan.DurationDays, PlanRuleLimit: plan.RuleLimit,
 			PlanUserGroupID: plan.UserGroupID, Status: model.OrderStatusPending, UserNote: input.UserNote,
+			PaymentMethod: model.PaymentMethodManual,
 		}
 		return tx.Create(&order).Error
 	})
@@ -265,25 +266,12 @@ func reviewOrder(c *gin.Context, targetStatus string) {
 		}
 		stateChanged = true
 		if targetStatus == model.OrderStatusApproved {
-			var user model.User
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, order.UserID).Error; err != nil {
+			if err := fulfillOrder(tx, &order, now); err != nil {
 				return err
 			}
-			base := now
-			if user.ExpireAt.After(base) {
-				base = user.ExpireAt
-			}
-			updates := map[string]interface{}{
-				"rule_limit": order.PlanRuleLimit, "expire_at": base.AddDate(0, 0, order.PlanDurationDays), "updated_at": now,
-			}
-			if order.PlanUserGroupID != nil {
-				var count int64
-				if err := tx.Model(&model.UserGroup{}).Where("id = ?", *order.PlanUserGroupID).Count(&count).Error; err != nil || count != 1 {
-					return gorm.ErrRecordNotFound
-				}
-				updates["user_group_id"] = *order.PlanUserGroupID
-			}
-			if err := tx.Model(&user).Updates(updates).Error; err != nil {
+			if err := tx.Model(&model.Order{}).Where("id = ?", order.ID).Updates(map[string]interface{}{
+				"paid_cents": order.PlanPriceCents, "fulfilled_at": now,
+			}).Error; err != nil {
 				return err
 			}
 		}
@@ -305,6 +293,28 @@ func reviewOrder(c *gin.Context, targetStatus string) {
 		notifyTelegram("订单 #" + strconv.FormatUint(uint64(order.ID), 10) + " 已" + map[string]string{model.OrderStatusApproved: "批准", model.OrderStatusRejected: "拒绝"}[targetStatus])
 	}
 	c.JSON(http.StatusOK, order)
+}
+
+func fulfillOrder(tx *gorm.DB, order *model.Order, now time.Time) error {
+	var user model.User
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, order.UserID).Error; err != nil {
+		return err
+	}
+	base := now
+	if user.ExpireAt.After(base) {
+		base = user.ExpireAt
+	}
+	updates := map[string]interface{}{
+		"rule_limit": order.PlanRuleLimit, "expire_at": base.AddDate(0, 0, order.PlanDurationDays), "updated_at": now,
+	}
+	if order.PlanUserGroupID != nil {
+		var count int64
+		if err := tx.Model(&model.UserGroup{}).Where("id = ?", *order.PlanUserGroupID).Count(&count).Error; err != nil || count != 1 {
+			return gorm.ErrRecordNotFound
+		}
+		updates["user_group_id"] = *order.PlanUserGroupID
+	}
+	return tx.Model(&user).Updates(updates).Error
 }
 
 func applyServicePlanInput(plan *model.ServicePlan, input servicePlanInput, creating bool) error {
@@ -340,7 +350,7 @@ func applyServicePlanInput(plan *model.ServicePlan, input servicePlanInput, crea
 	if plan.Name == "" || utf8.RuneCountInString(plan.Name) > 100 || utf8.RuneCountInString(plan.Description) > 500 {
 		return errors.New("套餐名称或描述无效")
 	}
-	if plan.PriceCents < 0 || plan.DurationDays <= 0 || plan.DurationDays > 3650 || plan.RuleLimit < 0 || plan.RuleLimit > 1000000 {
+	if plan.PriceCents < 0 || plan.PriceCents > maxBalanceAmount || plan.DurationDays <= 0 || plan.DurationDays > 3650 || plan.RuleLimit < 0 || plan.RuleLimit > 1000000 {
 		return errors.New("套餐价格、时长或规则限制无效")
 	}
 	return nil
