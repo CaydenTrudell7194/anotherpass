@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -218,8 +219,20 @@ func userNodeWebSocket(c *gin.Context, clientIP string, token string, userNode *
 	}
 }
 
+func realClientIP(c *gin.Context) string {
+	if ip := strings.TrimSpace(c.GetHeader("X-Real-IP")); ip != "" && net.ParseIP(ip) != nil {
+		return ip
+	}
+	if fwd := strings.TrimSpace(c.GetHeader("X-Forwarded-For")); fwd != "" {
+		if ip := strings.Split(fwd, ",")[0]; net.ParseIP(strings.TrimSpace(ip)) != nil {
+			return strings.TrimSpace(ip)
+		}
+	}
+	return c.ClientIP()
+}
+
 func NodeWebSocket(c *gin.Context) {
-	clientIP := c.ClientIP()
+	clientIP := realClientIP(c)
 	token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
 	if token == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "节点认证失败"})

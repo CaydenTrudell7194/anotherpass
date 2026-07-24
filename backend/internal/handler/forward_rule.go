@@ -75,7 +75,7 @@ func validateForwardRule(input *forwardRuleInput) string {
 	input.TargetAddr = strings.TrimSpace(input.TargetAddr)
 	input.Protocol = strings.ToLower(strings.TrimSpace(input.Protocol))
 	if input.Protocol == "" {
-		input.Protocol = "tcp"
+		input.Protocol = "tcp+udp"
 	}
 	if input.Dest != "" {
 		addr, port := parseDest(input.Dest)
@@ -96,8 +96,8 @@ func validateForwardRule(input *forwardRuleInput) string {
 	if input.TargetAddr == "" || len(input.TargetAddr) > 256 {
 		return "目标地址不能为空且不能超过256个字符"
 	}
-	if input.Protocol != "tcp" {
-		return "当前仅支持TCP协议"
+	if input.Protocol != "tcp" && input.Protocol != "udp" && input.Protocol != "tcp+udp" {
+		return "协议仅支持 tcp、udp 或 tcp+udp"
 	}
 	if math.IsNaN(input.Rate) || math.IsInf(input.Rate, 0) || input.Rate < 0 {
 		return "倍率无效"

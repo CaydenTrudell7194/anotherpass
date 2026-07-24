@@ -133,7 +133,7 @@ export default function ForwardRules() {
 
     try {
       if (text.startsWith('[')) {
-        // NY 新格式 (JSON)
+        // JSON 数组格式
         const json = JSON.parse(text)
         parsed = (Array.isArray(json) ? json : [json]).map((r: any) => {
           let target_addr = r.target_addr || r.目标地址 || ''
@@ -155,13 +155,30 @@ export default function ForwardRules() {
           }
         })
       } else {
-        // NY 旧格式: 名称#监听端口#目标地址#目标端口
+        // 每行独立解析：JSON 对象 或 NY 旧格式 名称#监听端口#目标地址#目标端口
         const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
         parsed = lines.map(line => {
+          // 尝试 JSON 对象
+          if (line.startsWith('{')) {
+            try {
+              const r = JSON.parse(line)
+              let target_addr = r.target_addr || ''
+              let target_port = r.target_port || 0
+              if (r.dest && Array.isArray(r.dest) && r.dest.length > 0) {
+                const parts = r.dest[0].split(':')
+                if (parts.length === 2) {
+                  target_addr = parts[0]
+                  target_port = parseInt(parts[1], 10) || 0
+                }
+              }
+              return { name: r.name || '', device_group_id: values.device_group_id, listen_port: r.listen_port || 0, target_addr, target_port: Number(target_port), protocol: String(r.protocol || 'tcp+udp').toLowerCase() }
+            } catch { /* fall through to line format */ }
+          }
+          // NY 旧格式: 名称#监听端口#目标地址#目标端口
           const parts = line.split('#')
           const [name, listen_port, target_addr, target_port] = parts
           if (parts.length !== 4) throw new Error('invalid fields')
-          return { name, device_group_id: values.device_group_id, listen_port: Number(listen_port), target_addr, target_port: Number(target_port), protocol: 'tcp' }
+          return { name, device_group_id: values.device_group_id, listen_port: Number(listen_port), target_addr, target_port: Number(target_port), protocol: 'tcp+udp' }
         })
       }
     } catch {
@@ -333,7 +350,7 @@ export default function ForwardRules() {
         footer={null}
         destroyOnClose
       >
-        <Form form={form} layout="vertical" onFinish={handleAdd} initialValues={{ protocol: 'tcp' }}>
+        <Form form={form} layout="vertical" onFinish={handleAdd} initialValues={{ protocol: 'tcp+udp' }}>
           <Form.Item name="name" label="规则名" rules={[{ required: true, message: '请输入规则名' }]}>
             <Input placeholder="规则名称" />
           </Form.Item>
@@ -353,12 +370,7 @@ export default function ForwardRules() {
             <Input.TextArea rows={3} placeholder={"例如:\n192.168.1.100:80\n10.0.0.1:443"} />
           </Form.Item>
           <Form.Item name="target_addr" hidden><Input /></Form.Item>
-          <Form.Item name="target_port" hidden><InputNumber /></Form.Item>
-          <Form.Item name="protocol" label="协议">
-            <Select>
-              <Select.Option value="tcp">TCP</Select.Option>
-            </Select>
-          </Form.Item>
+          <Form.Item name="target_port" hidden><InputNumber />          </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={submitting} block>
               {editingRule ? '保存修改' : '添加'}
