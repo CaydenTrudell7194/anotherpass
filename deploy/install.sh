@@ -28,6 +28,10 @@ detect_arch() {
 
 ARCH=$(detect_arch)
 
+is_ip() {
+  [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$1" =~ ^[0-9a-fA-F:]+$ ]]
+}
+
 echo ""
 echo -e "${YELLOW}[1/6] 安装 Docker...${NC}"
 if ! command -v docker &> /dev/null; then
@@ -61,7 +65,7 @@ chmod +x backend nodeclient 2>/dev/null || true
 echo -e "${YELLOW}[3/6] 配置域名和密码...${NC}"
 read -p "请输入面板域名 (如 panel.example.com): " DOMAIN
 USE_HTTPS="y"
-if [ -n "$DOMAIN" ] && ! [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+if [ -n "$DOMAIN" ] && ! is_ip "$DOMAIN"; then
   read -p "启用 HTTPS (Let's Encrypt)? (Y/n) 选n则仅HTTP，可用于套CDN回源: " USE_HTTPS
   USE_HTTPS="${USE_HTTPS:-y}"
 fi
@@ -73,7 +77,7 @@ MIGRATE=1 ADMIN="admin" ./backend 2>/dev/null || true
 
 echo -e "${YELLOW}[5/6] 配置 Caddy 反向代理...${NC}"
 mkdir -p caddy
-if [ -z "$DOMAIN" ] || [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+if [ -z "$DOMAIN" ] || is_ip "$DOMAIN"; then
   cat > caddy/Caddyfile << CADDYEOF
 :80 {
   root * /opt/backend/public
@@ -148,7 +152,7 @@ docker compose up -d
 
 PROTO="https://"
 ADDR="${DOMAIN}"
-if [ -z "$DOMAIN" ] || [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+if [ -z "$DOMAIN" ] || is_ip "$DOMAIN"; then
   PROTO="http://"
   ADDR="${DOMAIN:-$(curl -fsSL ifconfig.me)}"
 elif [ "$USE_HTTPS" = "n" ]; then
@@ -163,7 +167,7 @@ echo -e "${GREEN}  密码: ${ADMIN_PWD}${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 NODE_PROTO="https://"
-[ "$USE_HTTPS" = "n" ] || [ -z "$DOMAIN" ] || [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && NODE_PROTO="http://"
+[ "$USE_HTTPS" = "n" ] || [ -z "$DOMAIN" ] || is_ip "$DOMAIN" && NODE_PROTO="http://"
 echo "节点客户端安装命令 (在入口机运行):"
 echo -e "  ${YELLOW}curl -fL https://github.com/${REPO}/releases/latest/download/nodeclient-linux-\$(uname -m).tar.gz -o /tmp/nc.tar.gz && tar xzf /tmp/nc.tar.gz -C /usr/local/bin/ && chmod +x /usr/local/bin/nodeclient${NC}"
 echo ""
