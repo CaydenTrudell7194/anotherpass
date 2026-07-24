@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -7,11 +5,13 @@ services:
       dockerfile: Dockerfile
     restart: always
     ports:
-      - "18888:18888"
+      - "127.0.0.1:18888:18888"
     environment:
       - LISTEN=0.0.0.0:18888
       - DATABASE=sqlite3:///data/data.db
       - FRONTEND_DIR=/app/public
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
     volumes:
       - panel-data:/data
     networks:

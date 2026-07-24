@@ -36,10 +36,15 @@ func Login(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "账户已禁用或已过期"})
 		return
 	}
+	if !user.ExpireAt.IsZero() && time.Now().After(user.ExpireAt) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "账户已过期"})
+		return
+	}
 	claims := &middleware.Claims{
-		UserID:   user.ID,
-		Username: user.Username,
-		IsAdmin:  user.IsAdmin,
+		UserID:       user.ID,
+		Username:     user.Username,
+		IsAdmin:      user.IsAdmin,
+		TokenVersion: user.TokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 		},
@@ -80,7 +85,18 @@ func ChangePassword(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "原密码错误"})
 		return
 	}
-	hash, _ := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
-	model.DB.Model(&user).Update("password", string(hash))
+	if len(req.NewPassword) < 8 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "新密码至少需要8个字符"})
+		return
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "密码无效"})
+		return
+	}
+	if err := model.DB.Model(&user).Updates(map[string]interface{}{"password": string(hash), "token_version": user.TokenVersion + 1, "updated_at": time.Now()}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "修改失败"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "修改成功"})
 }

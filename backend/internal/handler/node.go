@@ -18,6 +18,30 @@ func ListNodeStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, nodes)
 }
 
+func ListMyNodeStatus(c *gin.Context) {
+	var user model.User
+	if err := model.DB.First(&user, c.GetUint("user_id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+		return
+	}
+	var groups []model.DeviceGroup
+	if err := model.DB.Find(&groups).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败"})
+		return
+	}
+	groupIDs := make([]uint, 0)
+	for _, group := range groups {
+		if authorizeDeviceGroup(user.ID, group.ID, false) == nil {
+			groupIDs = append(groupIDs, group.ID)
+		}
+	}
+	var nodes []model.Node
+	if len(groupIDs) > 0 {
+		model.DB.Where("device_group_id IN ?", groupIDs).Order("id desc").Find(&nodes)
+	}
+	c.JSON(http.StatusOK, nodes)
+}
+
 func NodeHeartbeat(c *gin.Context) {
 	var req struct {
 		Token string `json:"token"`
@@ -56,7 +80,10 @@ func RegisterNode(c *gin.Context) {
 		return
 	}
 	b := make([]byte, 32)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成节点令牌失败"})
+		return
+	}
 	token := hex.EncodeToString(b)
 	node := model.Node{
 		DeviceGroupID: req.DeviceGroupID,
@@ -86,8 +113,20 @@ func CheckOfflineNodes() {
 }
 
 func DeleteNode(c *gin.Context) {
-	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
-	model.DB.Delete(&model.Node{}, id)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID无效"})
+		return
+	}
+	result := model.DB.Delete(&model.Node{}, id)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败"})
+		return
+	}
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "节点不存在"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
 }
 
@@ -105,6 +144,6 @@ func GetNodeRules(c *gin.Context) {
 		return
 	}
 	var rules []model.ForwardRule
-	model.DB.Where("device_group_id = ? AND enabled = ?", node.DeviceGroupID, true).Find(&rules)
+	model.DB.Where("device_group_id = ? AND enabled = ? AND status = ?", node.DeviceGroupID, true, "active").Find(&rules)
 	c.JSON(http.StatusOK, gin.H{"rules": rules})
 }

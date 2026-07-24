@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Card, Form, Input, Button, Typography, message } from 'antd'
 import { UserOutlined, LockOutlined, SendOutlined } from '@ant-design/icons'
-import { login } from '../api'
+import { errorMessage, login } from '../api'
 import { useNavigate } from 'react-router-dom'
 
 const { Title, Text } = Typography
@@ -14,11 +14,13 @@ export default function Login() {
     setLoading(true)
     try {
       const res = await login(values.username, values.password)
-      localStorage.setItem('token', res.data.token || res.data.access_token)
+      const token = res.data.token || res.data.access_token
+      if (typeof token !== 'string' || !token) throw new Error('invalid token')
+      localStorage.setItem('token', token)
       message.success('登录成功')
       navigate('/')
-    } catch {
-      message.error('用户名或密码错误')
+    } catch (err) {
+      message.error(errorMessage(err, '登录失败，请检查网络或服务状态'))
     } finally {
       setLoading(false)
     }

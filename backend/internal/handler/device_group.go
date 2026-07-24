@@ -8,6 +8,7 @@ import (
 	"forward-panel/internal/model"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func ListDeviceGroups(c *gin.Context) {
@@ -61,7 +62,11 @@ func CreateDeviceGroup(c *gin.Context) {
 }
 
 func UpdateDeviceGroup(c *gin.Context) {
-	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID无效"})
+		return
+	}
 	var orig model.DeviceGroup
 	if err := model.DB.First(&orig, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "设备组不存在"})
@@ -105,13 +110,48 @@ func UpdateDeviceGroup(c *gin.Context) {
 	if input.SortOrder != nil {
 		orig.SortOrder = *input.SortOrder
 	}
-	model.DB.Save(&orig)
+	if err := model.DB.Save(&orig).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败"})
+		return
+	}
 	c.JSON(http.StatusOK, orig)
 }
 
 func DeleteDeviceGroup(c *gin.Context) {
-	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
-	model.DB.Delete(&model.DeviceGroup{}, id)
-	model.DB.Where("device_group_id = ?", id).Delete(&model.Node{})
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID无效"})
+		return
+	}
+	var rules int64
+	if err := model.DB.Model(&model.ForwardRule{}).Where("device_group_id = ?", id).Count(&rules).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "检查依赖失败"})
+		return
+	}
+	if rules > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "设备组仍有转发规则，无法删除"})
+		return
+	}
+	err = model.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("device_group_id = ?", id).Delete(&model.Node{}).Error; err != nil {
+			return err
+		}
+		result := tx.Delete(&model.DeviceGroup{}, id)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
+	})
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "设备组不存在"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
 }

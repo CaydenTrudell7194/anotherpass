@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,13 +13,15 @@ import (
 	"forward-panel/internal/middleware"
 	"forward-panel/internal/model"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
 	cfg := config.Load()
+	if err := middleware.ConfigureJWTSecret(); err != nil {
+		log.Fatalf("安全配置错误: %v", err)
+	}
 
 	dsn := cfg.Database
 	if len(dsn) > 9 && dsn[:9] == "sqlite3://" {
@@ -29,7 +32,9 @@ func main() {
 		log.Fatalf("数据库初始化失败: %v", err)
 	}
 
-	initDefaults()
+	if err := initDefaults(); err != nil {
+		log.Fatalf("初始化默认数据失败: %v", err)
+	}
 
 	// 节点离线检测
 	go func() {
@@ -40,15 +45,16 @@ func main() {
 	}()
 
 	r := gin.Default()
-
-	r.Use(cors.New(cors.Config{
-		AllowAllOrigins:  true,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
+	if err := r.SetTrustedProxies(nil); err != nil {
+		log.Fatalf("代理配置失败: %v", err)
+	}
+	r.Use(func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4<<20)
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("Referrer-Policy", "same-origin")
+		c.Next()
+	})
 
 	r.Static("/assets", cfg.FrontendDir+"/assets")
 	r.StaticFile("/", cfg.FrontendDir+"/index.html")
@@ -65,6 +71,7 @@ func main() {
 			auth.PUT("/password", handler.ChangePassword)
 
 			auth.GET("/device_groups", handler.ListMyDeviceGroups)
+			auth.GET("/nodes", handler.ListMyNodeStatus)
 			auth.GET("/forward_rules", handler.ListForwardRules)
 			auth.POST("/forward_rules", handler.CreateForwardRule)
 			auth.PUT("/forward_rules/:id", handler.UpdateForwardRule)
@@ -104,26 +111,38 @@ func main() {
 	}
 
 	log.Printf("面板启动，监听 %s", cfg.Listen)
-	if err := r.Run(cfg.Listen); err != nil {
+	server := &http.Server{
+		Addr: cfg.Listen, Handler: r,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("启动失败: %v", err)
 	}
 }
 
-func initDefaults() {
+func initDefaults() error {
 	var count int64
 	model.DB.Model(&model.UserGroup{}).Count(&count)
 	if count == 0 {
-		model.DB.Create(&model.UserGroup{Name: "默认用户组", Description: "系统默认用户组"})
+		if err := model.DB.Create(&model.UserGroup{Name: "默认用户组", Description: "系统默认用户组"}).Error; err != nil {
+			return err
+		}
 	}
 
 	model.DB.Model(&model.User{}).Count(&count)
 	if count == 0 {
 		adminPwd := os.Getenv("ADMIN_PASSWORD")
 		if adminPwd == "" {
-			adminPwd = "admin"
+			return fmt.Errorf("ADMIN_PASSWORD is required on first startup")
 		}
-		hash, _ := bcrypt.GenerateFromPassword([]byte(adminPwd), bcrypt.DefaultCost)
-		model.DB.Create(&model.User{
+		hash, err := bcrypt.GenerateFromPassword([]byte(adminPwd), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		if err := model.DB.Create(&model.User{
 			Username:    "admin",
 			Password:    string(hash),
 			DisplayName: "管理员",
@@ -132,9 +151,10 @@ func initDefaults() {
 			IsAdmin:     true,
 			ExpireAt:    time.Now().AddDate(10, 0, 0),
 			RuleLimit:   9999,
-		})
-		fmt.Println("========================================")
-		fmt.Println("  默认管理员: admin / " + adminPwd)
-		fmt.Println("========================================")
+		}).Error; err != nil {
+			return err
+		}
+		fmt.Println("已创建默认管理员 admin，请妥善保管安装时设置的密码")
 	}
+	return nil
 }

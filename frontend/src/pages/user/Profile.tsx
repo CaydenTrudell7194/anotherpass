@@ -47,7 +47,7 @@ export default function Profile() {
             <Tag color={user?.is_admin ? 'red' : 'blue'}>{user?.is_admin ? '管理员' : '普通用户'}</Tag>
           </Descriptions.Item>
           <Descriptions.Item label="过期时间">
-            {user?.expired_at ? new Date(user.expired_at).toLocaleDateString() : '永久'}
+            {user?.expire_at ? new Date(user.expire_at).toLocaleDateString() : '永久'}
           </Descriptions.Item>
           <Descriptions.Item label="创建时间">
             {user?.created_at ? new Date(user.created_at).toLocaleString() : '-'}
@@ -60,7 +60,7 @@ export default function Profile() {
           <Form.Item name="old_password" label="旧密码" rules={[{ required: true, message: '请输入旧密码' }]}>
             <Input.Password prefix={<KeyOutlined />} placeholder="请输入旧密码" />
           </Form.Item>
-          <Form.Item name="new_password" label="新密码" rules={[{ required: true, min: 6, message: '新密码至少6位' }]}>
+          <Form.Item name="new_password" label="新密码" rules={[{ required: true, min: 8, message: '新密码至少8位' }]}>
             <Input.Password prefix={<LockOutlined />} placeholder="请输入新密码" />
           </Form.Item>
           <Form.Item name="confirm" label="确认新密码" dependencies={['new_password']}

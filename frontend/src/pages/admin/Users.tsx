@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Table, Button, Modal, Form, Input, Select, DatePicker, Switch, Popconfirm, Space, Progress, Tag, message, Tooltip } from 'antd'
+import { Table, Button, Modal, Form, Input, InputNumber, Select, DatePicker, Switch, Popconfirm, Space, Progress, Tag, message, Tooltip } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { listUsers, createUser, updateUser, deleteUser, listUserGroups } from '../../api'
@@ -90,7 +90,7 @@ const Users: React.FC = () => {
       const payload = {
         ...values,
         status: values.status ? 'active' : 'disabled',
-        expire_at: values.expire_at ? values.expire_at.toISOString() : null,
+        expire_at: values.expire_at ? values.expire_at.toISOString() : '0001-01-01T00:00:00Z',
       }
       if (editingUser) {
         await updateUser(editingUser.id, payload)
@@ -212,10 +212,10 @@ const Users: React.FC = () => {
             </Select>
           </Form.Item>
           <Form.Item name="traffic_limit" label="流量限制 (字节)" tooltip="0 表示不限制">
-            <Input type="number" min={0} />
+            <InputNumber min={0} precision={0} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="rule_limit" label="规则数限制" tooltip="0 表示不限制">
-            <Input type="number" min={0} />
+            <InputNumber min={0} precision={0} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="status" label="状态" valuePropName="checked" initialValue={true}>
             <Switch checkedChildren="启用" unCheckedChildren="禁用" />

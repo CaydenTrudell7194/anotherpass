@@ -3,7 +3,7 @@
 # 转发面板 - 一键安装脚本
 # 用法: bash <(curl -fsSL https://raw.githubusercontent.com/CaydenTrudell7194/anotherpass/main/deploy/install.sh)
 #
-set -e
+set -euo pipefail
 
 REPO="CaydenTrudell7194/anotherpass"
 VERSION="${1:-latest}"
@@ -29,7 +29,11 @@ detect_arch() {
 ARCH=$(detect_arch)
 
 is_ip() {
-  [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$1" =~ ^[0-9a-fA-F:]+$ ]]
+	[[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$1" =~ ^\[?[0-9a-fA-F:]+\]?$ ]]
+}
+
+is_domain() {
+	[[ "$1" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]]
 }
 
 echo ""
@@ -39,10 +43,15 @@ if ! command -v docker &> /dev/null; then
   systemctl enable docker; systemctl start docker
 fi
 
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null 2>&1; then
+if docker compose version &> /dev/null; then
+  COMPOSE=(docker compose)
+elif command -v docker-compose &> /dev/null; then
+  COMPOSE=(docker-compose)
+else
   DOCKER_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep tag_name | cut -d'"' -f4)
-  curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  curl -fL "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
   chmod +x /usr/local/bin/docker-compose
+  COMPOSE=(docker-compose)
 fi
 
 echo -e "${YELLOW}[2/6] 下载程序...${NC}"
@@ -64,22 +73,61 @@ chmod +x backend nodeclient 2>/dev/null || true
 
 echo -e "${YELLOW}[3/6] 配置域名和密码...${NC}"
 read -p "请输入面板域名 (如 panel.example.com): " DOMAIN
+if [ -n "$DOMAIN" ] && ! is_ip "$DOMAIN" && ! is_domain "$DOMAIN"; then
+  echo -e "${RED}域名格式无效${NC}"
+  exit 1
+fi
 USE_HTTPS="y"
 if [ -n "$DOMAIN" ] && ! is_ip "$DOMAIN"; then
   read -p "启用 HTTPS (Let's Encrypt)? (Y/n) 选n则仅HTTP，可用于套CDN回源: " USE_HTTPS
   USE_HTTPS="${USE_HTTPS:-y}"
 fi
-read -p "设置管理员密码 (留空默认 admin): " ADMIN_PWD
-ADMIN_PWD="${ADMIN_PWD:-admin}"
+umask 077
+LEGACY_UPGRADE="n"
+if [ -f data.db ] && [ ! -f panel.env ]; then
+  LEGACY_UPGRADE="y"
+fi
+if [ -f panel.env ]; then
+  echo "检测到已有配置，将保留管理员密码和 JWT 密钥"
+  ADMIN_PWD=""
+elif [ "$LEGACY_UPGRADE" = "y" ]; then
+  echo "检测到旧版数据库，将保留原管理员密码并生成新的 JWT 密钥"
+  ADMIN_PWD=""
+  BOOTSTRAP_PWD=$(openssl rand -hex 16 2>/dev/null || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+  JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+  cat > panel.env << ENVEOF
+ADMIN_PASSWORD=${BOOTSTRAP_PWD}
+JWT_SECRET=${JWT_SECRET}
+DATABASE=sqlite3:///data/data.db
+ENVEOF
+else
+  read -s -p "设置管理员密码 (至少8位，仅支持字母、数字和常用符号): " ADMIN_PWD
+  echo ""
+  if [ ${#ADMIN_PWD} -lt 8 ] || ! [[ "$ADMIN_PWD" =~ ^[A-Za-z0-9@%_+=:,\.\!\?-]+$ ]]; then
+    echo -e "${RED}密码至少8位，且不能包含空格、引号、$或换行${NC}"
+    exit 1
+  fi
+  JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+  cat > panel.env << ENVEOF
+ADMIN_PASSWORD=${ADMIN_PWD}
+JWT_SECRET=${JWT_SECRET}
+DATABASE=sqlite3:///data/data.db
+ENVEOF
+fi
+mkdir -p data caddy
+chmod 700 data
+chmod 600 panel.env
+if [ -f data.db ] && [ ! -f data/data.db ]; then
+  mv data.db data/data.db
+fi
 
 echo -e "${YELLOW}[4/6] 配置 Caddy 反向代理...${NC}"
-mkdir -p caddy
 if [ -z "$DOMAIN" ] || is_ip "$DOMAIN"; then
   cat > caddy/Caddyfile << CADDYEOF
 :80 {
   reverse_proxy /api/* 127.0.0.1:18888
   handle {
-    root * /opt/backend/public
+    root * /srv/public
     try_files {path} /index.html
     file_server
   }
@@ -92,7 +140,7 @@ ${DOMAIN}:80 {
     header_up X-Real-IP {http.request.header.CF-Connecting-IP}
   }
   handle {
-    root * /opt/backend/public
+    root * /srv/public
     try_files {path} /index.html
     file_server
   }
@@ -106,7 +154,7 @@ ${DOMAIN} {
     header_up X-Real-IP {http.request.header.CF-Connecting-IP}
   }
   handle {
-    root * /opt/backend/public
+    root * /srv/public
     try_files {path} /index.html
     file_server
   }
@@ -115,20 +163,20 @@ CADDYEOF
 fi
 
 cat > docker-compose.yml << DOCKEREOF
-version: '3.8'
 services:
   backend:
     image: debian:bookworm-slim
     network_mode: host
     restart: always
+    env_file:
+      - ./panel.env
     volumes:
-      - ${INSTALL_DIR}:/opt/backend
-    working_dir: /opt/backend
-    command: sh -c "mkdir -p /opt/backend && /opt/backend/backend"
+      - ${INSTALL_DIR}/backend:/app/backend:ro
+      - ${INSTALL_DIR}/data:/data
+    command: /app/backend
     environment:
       - LISTEN=127.0.0.1:18888
-      - DATABASE=sqlite3:///opt/backend/data.db
-      - ADMIN_PASSWORD=${ADMIN_PWD}
+      - DATABASE=sqlite3:///data/data.db
     logging:
       driver: "json-file"
       options:
@@ -139,8 +187,8 @@ services:
     network_mode: host
     restart: always
     volumes:
-      - ${INSTALL_DIR}:/opt/backend
-      - ${INSTALL_DIR}/caddy:/etc/caddy
+      - ${INSTALL_DIR}/public:/srv/public:ro
+      - ${INSTALL_DIR}/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
     logging:
       driver: "json-file"
@@ -152,8 +200,8 @@ volumes:
 DOCKEREOF
 
 echo -e "${YELLOW}[6/6] 启动服务...${NC}"
-docker compose down 2>/dev/null || true
-docker compose up -d
+"${COMPOSE[@]}" down 2>/dev/null || true
+"${COMPOSE[@]}" up -d
 
 PROTO="https://"
 ADDR="${DOMAIN}"
@@ -168,13 +216,17 @@ echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  安装完成!${NC}"
 echo -e "${GREEN}  面板地址: ${PROTO}${ADDR}${NC}"
 echo -e "${GREEN}  管理员: admin${NC}"
-echo -e "${GREEN}  密码: ${ADMIN_PWD}${NC}"
+if [ -n "$ADMIN_PWD" ]; then
+  echo -e "${GREEN}  管理员密码使用安装时输入的值（不会回显）${NC}"
+else
+  echo -e "${GREEN}  已保留原管理员密码${NC}"
+fi
 echo -e "${GREEN}========================================${NC}"
 echo ""
 NODE_PROTO="https://"
-[ "$USE_HTTPS" = "n" ] || [ -z "$DOMAIN" ] || is_ip "$DOMAIN" && NODE_PROTO="http://"
+[ -z "$DOMAIN" ] || is_ip "$DOMAIN" && NODE_PROTO="http://"
 echo "节点客户端安装命令 (在入口机运行):"
-echo -e "  ${YELLOW}curl -fL https://github.com/${REPO}/releases/latest/download/nodeclient-linux-\$(uname -m).tar.gz -o /tmp/nc.tar.gz && tar xzf /tmp/nc.tar.gz -C /usr/local/bin/ && chmod +x /usr/local/bin/nodeclient${NC}"
+echo -e "  ${YELLOW}ARCH=\$(case \$(uname -m) in x86_64|amd64) echo amd64;; aarch64|arm64) echo arm64;; esac); curl -fL https://github.com/${REPO}/releases/latest/download/nodeclient-linux-\${ARCH}.tar.gz -o /tmp/nc.tar.gz && tar xzf /tmp/nc.tar.gz -C /usr/local/bin/ && chmod +x /usr/local/bin/nodeclient${NC}"
 echo ""
 echo "对接入口机:"
 echo -e "  ${YELLOW}nodeclient --server ${NODE_PROTO}${ADDR} --token <节点令牌> --device <设备组ID>${NC}"

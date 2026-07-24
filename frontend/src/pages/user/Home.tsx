@@ -55,7 +55,7 @@ export default function Home() {
               </Descriptions.Item>
               <Descriptions.Item label="已用流量">{formatBytes(totalTraffic)}</Descriptions.Item>
               <Descriptions.Item label="过期时间">
-                {user?.expired_at ? new Date(user.expired_at).toLocaleDateString() : '永久'}
+                {user?.expire_at ? new Date(user.expire_at).toLocaleDateString() : '永久'}
               </Descriptions.Item>
             </Descriptions>
           </Card>

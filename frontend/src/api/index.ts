@@ -1,6 +1,9 @@
 import axios from 'axios'
 
-const api = axios.create({ baseURL: '/api' })
+const api = axios.create({ baseURL: '/api', timeout: 15000 })
+
+export const errorMessage = (err: any, fallback: string) =>
+  err?.response?.data?.error || (err?.code === 'ECONNABORTED' ? '请求超时' : fallback)
 
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token')

@@ -3,12 +3,14 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"forward-panel/internal/model"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 func AdminDashboard(c *gin.Context) {
@@ -37,55 +39,99 @@ func ListUsers(c *gin.Context) {
 }
 
 func CreateUser(c *gin.Context) {
-	var user model.User
-	if err := c.ShouldBindJSON(&user); err != nil {
+	var input struct {
+		Username     string    `json:"username"`
+		Password     string    `json:"password"`
+		DisplayName  string    `json:"display_name"`
+		UserGroupID  uint      `json:"user_group_id"`
+		Status       string    `json:"status"`
+		TrafficLimit int64     `json:"traffic_limit"`
+		RuleLimit    int       `json:"rule_limit"`
+		ExpireAt     time.Time `json:"expire_at"`
+		IsAdmin      bool      `json:"is_admin"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
 	}
-	if user.Username == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "用户名不能为空"})
+	input.Username = strings.TrimSpace(input.Username)
+	if input.Username == "" || len(input.Username) > 64 || len(input.Password) < 8 || input.TrafficLimit < 0 || input.RuleLimit < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "用户名、密码或限制参数无效"})
 		return
 	}
-	hash, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	user.Password = string(hash)
-	user.CreatedAt = time.Now()
-	user.UpdatedAt = time.Now()
-	if user.ExpireAt.IsZero() {
-		user.ExpireAt = time.Now().AddDate(1, 0, 0)
+	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "密码无效"})
+		return
 	}
+	if input.UserGroupID == 0 {
+		input.UserGroupID = 1
+	}
+	if input.Status == "" {
+		input.Status = "active"
+	}
+	if input.Status != "active" && input.Status != "disabled" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "用户状态无效"})
+		return
+	}
+	if input.ExpireAt.IsZero() {
+		input.ExpireAt = time.Now().AddDate(1, 0, 0)
+	}
+	now := time.Now()
+	user := model.User{Username: input.Username, Password: string(hash), DisplayName: input.DisplayName,
+		UserGroupID: input.UserGroupID, Status: input.Status, TrafficLimit: input.TrafficLimit,
+		RuleLimit: input.RuleLimit, ExpireAt: input.ExpireAt, IsAdmin: input.IsAdmin, CreatedAt: now, UpdatedAt: now}
 	if err := model.DB.Create(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建失败，用户名可能已存在"})
 		return
 	}
+	user.Password = ""
 	c.JSON(http.StatusOK, user)
 }
 
 func UpdateUser(c *gin.Context) {
-	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID无效"})
+		return
+	}
 	var user model.User
 	if err := model.DB.First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
 		return
 	}
 	var input struct {
-		Username     *string `json:"username"`
-		Password     *string `json:"password"`
-		DisplayName  *string `json:"display_name"`
-		UserGroupID  *uint   `json:"user_group_id"`
-		Status       *string `json:"status"`
-		TrafficLimit *int64  `json:"traffic_limit"`
-		RuleLimit    *int    `json:"rule_limit"`
-		IsAdmin      *bool   `json:"is_admin"`
+		Username     *string    `json:"username"`
+		Password     *string    `json:"password"`
+		DisplayName  *string    `json:"display_name"`
+		UserGroupID  *uint      `json:"user_group_id"`
+		Status       *string    `json:"status"`
+		TrafficLimit *int64     `json:"traffic_limit"`
+		RuleLimit    *int       `json:"rule_limit"`
+		IsAdmin      *bool      `json:"is_admin"`
+		ExpireAt     *time.Time `json:"expire_at"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
 	}
 	if input.Username != nil {
-		user.Username = *input.Username
+		user.Username = strings.TrimSpace(*input.Username)
+		if user.Username == "" || len(user.Username) > 64 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "用户名无效"})
+			return
+		}
 	}
 	if input.Password != nil && *input.Password != "" {
-		hash, _ := bcrypt.GenerateFromPassword([]byte(*input.Password), bcrypt.DefaultCost)
+		if len(*input.Password) < 8 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "密码至少需要8个字符"})
+			return
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(*input.Password), bcrypt.DefaultCost)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "密码无效"})
+			return
+		}
 		user.Password = string(hash)
 	}
 	if input.DisplayName != nil {
@@ -95,25 +141,73 @@ func UpdateUser(c *gin.Context) {
 		user.UserGroupID = *input.UserGroupID
 	}
 	if input.Status != nil {
+		if *input.Status != "active" && *input.Status != "disabled" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "用户状态无效"})
+			return
+		}
 		user.Status = *input.Status
 	}
 	if input.TrafficLimit != nil {
+		if *input.TrafficLimit < 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "流量限制无效"})
+			return
+		}
 		user.TrafficLimit = *input.TrafficLimit
 	}
 	if input.RuleLimit != nil {
+		if *input.RuleLimit < 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "规则限制无效"})
+			return
+		}
 		user.RuleLimit = *input.RuleLimit
 	}
 	if input.IsAdmin != nil {
 		user.IsAdmin = *input.IsAdmin
 	}
+	if input.ExpireAt != nil {
+		user.ExpireAt = *input.ExpireAt
+	}
 	user.UpdatedAt = time.Now()
-	model.DB.Save(&user)
+	user.TokenVersion++
+	if err := model.DB.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败"})
+		return
+	}
+	user.Password = ""
 	c.JSON(http.StatusOK, user)
 }
 
 func DeleteUser(c *gin.Context) {
-	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
-	model.DB.Delete(&model.User{}, id)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID无效"})
+		return
+	}
+	if uint(id) == c.GetUint("user_id") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "不能删除当前登录用户"})
+		return
+	}
+	err = model.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ?", id).Delete(&model.ForwardRule{}).Error; err != nil {
+			return err
+		}
+		result := tx.Delete(&model.User{}, id)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
+	})
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
 }
 

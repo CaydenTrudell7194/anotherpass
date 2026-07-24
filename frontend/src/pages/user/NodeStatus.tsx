@@ -10,7 +10,7 @@ export default function NodeStatus() {
 
   const fetchNodes = async () => {
     try {
-      const res = await api.get('/admin/nodes')
+      const res = await api.get('/nodes')
       const data = Array.isArray(res.data) ? res.data : res.data?.nodes || []
       setNodes(data)
     } catch {

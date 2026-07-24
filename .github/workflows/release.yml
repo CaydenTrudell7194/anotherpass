@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -17,9 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Cross Compiler (arm64)
+      - name: Setup QEMU (arm64)
         if: matrix.arch == 'arm64'
-        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+        uses: docker/setup-qemu-action@v3
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -34,15 +34,10 @@ jobs:
 
       - name: Build Backend (${{ matrix.arch }})
         run: |
-          cd backend
-          go mod tidy
-          go mod download
-          mkdir -p ../build
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            CC=aarch64-linux-gnu-gcc GOARCH=arm64 CGO_ENABLED=1 go build -o ../build/backend-linux-arm64 ./cmd/
-          else
-            CGO_ENABLED=1 go build -o ../build/backend-linux-amd64 ./cmd/
-          fi
+          mkdir -p ${{ github.workspace }}/build
+          docker run --rm --platform linux/${{ matrix.arch }} \
+            -v ${{ github.workspace }}:/workspace -w /workspace/backend golang:1.21-bookworm \
+            sh -c "go mod download && go mod verify && CGO_ENABLED=1 go test ./... && CGO_ENABLED=1 go build -o /workspace/build/backend-linux-${{ matrix.arch }} ./cmd/"
 
       - name: Build Node Client (${{ matrix.arch }})
         run: |
@@ -56,7 +51,7 @@ jobs:
       - name: Build Frontend
         run: |
           cd frontend
-          npm install
+          npm ci
           npm run build
           cp -r dist ../build/public
 
@@ -69,6 +64,8 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -80,6 +77,8 @@ jobs:
       - name: Create Release Archive
         run: |
           mkdir -p release
+          chmod 0755 artifacts/forward-panel-amd64/backend-linux-amd64 artifacts/forward-panel-amd64/nodeclient-linux-amd64
+          chmod 0755 artifacts/forward-panel-arm64/backend-linux-arm64 artifacts/forward-panel-arm64/nodeclient-linux-arm64
 
           # 独立 nodeclient (amd64)
           cp artifacts/forward-panel-amd64/nodeclient-linux-amd64 release/nodeclient

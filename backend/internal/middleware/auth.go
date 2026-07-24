@@ -1,26 +1,34 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
+	"time"
+
+	"forward-panel/internal/model"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var JWTSecret = func() []byte {
+var JWTSecret []byte
+
+func ConfigureJWTSecret() error {
 	s := os.Getenv("JWT_SECRET")
-	if s == "" {
-		s = "forward-panel-secret-key-change-me"
+	if len(s) < 32 {
+		return fmt.Errorf("JWT_SECRET must be at least 32 characters")
 	}
-	return []byte(s)
-}()
+	JWTSecret = []byte(s)
+	return nil
+}
 
 type Claims struct {
-	UserID   uint   `json:"user_id"`
-	Username string `json:"username"`
-	IsAdmin  bool   `json:"is_admin"`
+	UserID       uint   `json:"user_id"`
+	Username     string `json:"username"`
+	IsAdmin      bool   `json:"is_admin"`
+	TokenVersion uint   `json:"token_version"`
 	jwt.RegisteredClaims
 }
 
@@ -35,14 +43,19 @@ func AuthRequired() gin.HandlerFunc {
 		claims := &Claims{}
 		t, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
 			return JWTSecret, nil
-		})
+		}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 		if err != nil || !t.Valid {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "令牌无效"})
 			return
 		}
-		c.Set("user_id", claims.UserID)
-		c.Set("username", claims.Username)
-		c.Set("is_admin", claims.IsAdmin)
+		var user model.User
+		if err := model.DB.First(&user, claims.UserID).Error; err != nil || user.Status != "active" || user.TokenVersion != claims.TokenVersion || (!user.ExpireAt.IsZero() && time.Now().After(user.ExpireAt)) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "账户无效或已过期"})
+			return
+		}
+		c.Set("user_id", user.ID)
+		c.Set("username", user.Username)
+		c.Set("is_admin", user.IsAdmin)
 		c.Next()
 	}
 }

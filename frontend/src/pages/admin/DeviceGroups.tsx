@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Table, Button, Modal, Form, Input, Select, Switch, Popconfirm, Space, Tag, message, Progress, Tooltip } from 'antd'
+import { Table, Button, Modal, Form, Input, InputNumber, Select, Switch, Popconfirm, Space, message, Tooltip } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { listDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup } from '../../api'
 
@@ -192,10 +192,10 @@ const DeviceGroups: React.FC = () => {
             <Input.TextArea rows={2} />
           </Form.Item>
           <Form.Item name="rate" label="倍率" initialValue={1}>
-            <Input type="number" min={0} step={0.01} />
+            <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="sort_order" label="排序" initialValue={0}>
-            <Input type="number" />
+            <InputNumber precision={0} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="connection_addr" label="连接地址">
             <Input placeholder="例如: example.com:8080" />

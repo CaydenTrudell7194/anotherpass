@@ -125,6 +125,7 @@ export default function ForwardRules() {
           listen_port: r.listen_port || r.监听端口 || 0,
           target_addr: r.target_addr || r.目标地址 || '',
           target_port: r.target_port || r.目标端口 || 0,
+          protocol: String(r.protocol || r.协议 || 'tcp').toLowerCase(),
         }))
       } else {
         // NY 旧格式: 名称#监听端口#目标地址#目标端口
@@ -132,7 +133,8 @@ export default function ForwardRules() {
         parsed = lines.map(line => {
           const parts = line.split('#')
           const [name, listen_port, target_addr, target_port] = parts
-          return { name, device_group_id: values.device_group_id, listen_port: Number(listen_port), target_addr, target_port: Number(target_port) }
+          if (parts.length !== 4) throw new Error('invalid fields')
+          return { name, device_group_id: values.device_group_id, listen_port: Number(listen_port), target_addr, target_port: Number(target_port), protocol: 'tcp' }
         })
       }
     } catch {
@@ -142,6 +144,13 @@ export default function ForwardRules() {
 
     if (parsed.length === 0) {
       message.warning('没有有效的规则')
+      return
+    }
+    const invalidIndex = parsed.findIndex(r => !String(r.name || '').trim() || !String(r.target_addr || '').trim() ||
+      !Number.isInteger(r.listen_port) || r.listen_port < 1 || r.listen_port > 65535 ||
+      !Number.isInteger(r.target_port) || r.target_port < 1 || r.target_port > 65535 || r.protocol !== 'tcp')
+    if (invalidIndex >= 0) {
+      message.error(`第 ${invalidIndex + 1} 条规则无效；当前仅支持 TCP，端口范围为 1-65535`)
       return
     }
 
@@ -166,6 +175,7 @@ export default function ForwardRules() {
       listen_port: r.listen_port,
       target_addr: r.target_addr,
       target_port: r.target_port,
+      protocol: r.protocol || 'tcp',
     }))
     const json = JSON.stringify(exportData, null, 2)
     navigator.clipboard.writeText(json)
@@ -315,7 +325,6 @@ export default function ForwardRules() {
           <Form.Item name="protocol" label="协议">
             <Select>
               <Select.Option value="tcp">TCP</Select.Option>
-              <Select.Option value="udp">UDP</Select.Option>
             </Select>
           </Form.Item>
           <Form.Item>

@@ -1,13 +1,12 @@
-FROM golang:1.21-alpine AS builder
-RUN apk add --no-cache gcc musl-dev
+FROM golang:1.21-bookworm AS builder
 WORKDIR /build
-COPY go.mod ./
-RUN go mod tidy
+COPY go.mod go.sum ./
+RUN go mod download
 COPY . .
 RUN CGO_ENABLED=1 go build -o backend ./cmd/
 
-FROM alpine:3.19
-RUN apk add --no-cache ca-certificates tzdata sqlite-libs
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /build/backend .
 EXPOSE 18888
