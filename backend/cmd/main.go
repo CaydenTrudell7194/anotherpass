@@ -74,6 +74,9 @@ func main() {
 
 			auth.GET("/device_groups", handler.ListMyDeviceGroups)
 			auth.GET("/nodes", handler.ListMyNodeStatus)
+			auth.GET("/plans", handler.ListServicePlans)
+			auth.GET("/orders", handler.ListOrders)
+			auth.POST("/orders", handler.CreateOrder)
 			auth.GET("/forward_rules", handler.ListForwardRules)
 			auth.POST("/forward_rules", handler.CreateForwardRule)
 			auth.PUT("/forward_rules/:id", handler.UpdateForwardRule)
@@ -104,12 +107,21 @@ func main() {
 			admin.POST("/device_groups", handler.CreateDeviceGroup)
 			admin.PUT("/device_groups/:id", handler.UpdateDeviceGroup)
 			admin.DELETE("/device_groups/:id", handler.DeleteDeviceGroup)
+			admin.GET("/device_groups/:id/node-token", handler.GetDeviceGroupNodeToken)
+			admin.POST("/device_groups/:id/reset-node-token", handler.ResetDeviceGroupNodeToken)
 
 			admin.GET("/nodes", handler.ListNodeStatus)
 			admin.POST("/nodes/register", handler.RegisterNode)
 			admin.POST("/nodes/:id/setup", handler.GetNodeSetup)
 			admin.POST("/nodes/:id/rotate-token", handler.RotateNodeToken)
 			admin.DELETE("/nodes/:id", handler.DeleteNode)
+			admin.GET("/plans", handler.AdminListServicePlans)
+			admin.POST("/plans", handler.AdminCreateServicePlan)
+			admin.PUT("/plans/:id", handler.AdminUpdateServicePlan)
+			admin.DELETE("/plans/:id", handler.AdminDeleteServicePlan)
+			admin.GET("/orders", handler.AdminListOrders)
+			admin.POST("/orders/:id/approve", handler.AdminApproveOrder)
+			admin.POST("/orders/:id/reject", handler.AdminRejectOrder)
 		}
 
 		api.POST("/node/heartbeat", handler.NodeHeartbeat)

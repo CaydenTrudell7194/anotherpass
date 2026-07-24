@@ -214,10 +214,8 @@ func CheckOfflineNodes() {
 	offlineAfter := time.Duration(LoadSiteSettings().OfflineNodeSeconds) * time.Second
 	for _, n := range nodes {
 		if now.Sub(n.LastHeartbeat) > offlineAfter {
-			model.DB.Model(&n).Update("status", "offline")
-			var count int64
-			model.DB.Model(&model.Node{}).Where("device_group_id = ? AND status = ?", n.DeviceGroupID, "online").Count(&count)
-			model.DB.Model(&model.DeviceGroup{}).Where("id = ?", n.DeviceGroupID).Update("online_devices", count)
+			cutoff := now.Add(-offlineAfter)
+			markNodeOfflineBefore(n.ID, n.DeviceGroupID, &cutoff)
 		}
 	}
 }
@@ -292,16 +290,37 @@ func loadRulesForGroup(groupID uint) ([]model.ForwardRule, error) {
 
 func updateNodeHeartbeat(node *model.Node, ip string) {
 	now := time.Now()
-	model.DB.Model(&model.Node{}).Where("id = ?", node.ID).Updates(map[string]interface{}{"last_heartbeat": now, "status": "online", "ip": strings.TrimSpace(ip)})
+	values := map[string]interface{}{"last_heartbeat": now, "status": "online", "ip": strings.TrimSpace(ip)}
+	transition := model.DB.Model(&model.Node{}).Where("id = ? AND status <> ?", node.ID, "online").Updates(values)
+	if transition.RowsAffected == 0 {
+		model.DB.Model(&model.Node{}).Where("id = ?", node.ID).Updates(values)
+	}
 	node.LastHeartbeat = now
 	node.Status = "online"
 	node.IP = strings.TrimSpace(ip)
 	recountOnlineNodes(node.DeviceGroupID)
+	if transition.Error == nil && transition.RowsAffected == 1 {
+		notifyTelegram("节点上线：" + node.Name)
+	}
 }
 
 func markNodeOffline(nodeID, groupID uint) {
-	model.DB.Model(&model.Node{}).Where("id = ?", nodeID).Update("status", "offline")
+	markNodeOfflineBefore(nodeID, groupID, nil)
+}
+
+func markNodeOfflineBefore(nodeID, groupID uint, cutoff *time.Time) {
+	query := model.DB.Model(&model.Node{}).Where("id = ? AND status = ?", nodeID, "online")
+	if cutoff != nil {
+		query = query.Where("last_heartbeat < ?", *cutoff)
+	}
+	result := query.Update("status", "offline")
 	recountOnlineNodes(groupID)
+	if result.Error == nil && result.RowsAffected == 1 {
+		var node model.Node
+		if model.DB.Select("name").First(&node, nodeID).Error == nil {
+			notifyTelegram("节点离线：" + node.Name)
+		}
+	}
 }
 
 func recountOnlineNodes(groupID uint) {

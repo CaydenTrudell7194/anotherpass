@@ -274,6 +274,21 @@ func DeleteUserGroup(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "该用户组仍有用户，不能删除"})
 		return
 	}
+	var references int64
+	if err := model.DB.Model(&model.ServicePlan{}).Where("user_group_id = ?", id).Count(&references).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "检查依赖失败"})
+		return
+	}
+	if references == 0 {
+		if err := model.DB.Model(&model.Order{}).Where("plan_user_group_id = ? AND status = ?", id, model.OrderStatusPending).Count(&references).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "检查依赖失败"})
+			return
+		}
+	}
+	if references > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "该用户组仍被套餐或待处理订单引用，不能删除"})
+		return
+	}
 	result := model.DB.Delete(&model.UserGroup{}, id)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败"})

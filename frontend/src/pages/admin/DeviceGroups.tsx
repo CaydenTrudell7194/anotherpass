@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { Table, Button, Modal, Form, Input, InputNumber, Select, Switch, Popconfirm, Space, message, Tooltip } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
-import { listDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup } from '../../api'
+import { Table, Button, Modal, Form, Input, InputNumber, Select, Switch, Popconfirm, Space, message, Tooltip, Tag } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, KeyOutlined } from '@ant-design/icons'
+import { listDeviceGroups, createDeviceGroup, updateDeviceGroup, deleteDeviceGroup, listNodes, deleteNode, getDeviceGroupNodeToken, resetDeviceGroupNodeToken } from '../../api'
 
 interface DeviceGroup {
   id: number
@@ -21,9 +21,8 @@ interface DeviceGroup {
 const TYPE_LABELS: Record<string, string> = {
   entry_force_direct: '入口(强制直出)',
   entry_optional_direct: '入口(可选直出)',
-  entry: '入口',
-  monitor: '仅监控',
 }
+const releaseTag = import.meta.env.VITE_RELEASE_TAG || 'latest'
 
 const DeviceGroups: React.FC = () => {
   const [groups, setGroups] = useState<DeviceGroup[]>([])
@@ -32,6 +31,8 @@ const DeviceGroups: React.FC = () => {
   const [editingGroup, setEditingGroup] = useState<DeviceGroup | null>(null)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+  const [nodes, setNodes] = useState<any[]>([])
+  const [command, setCommand] = useState('')
 
   useEffect(() => {
     fetchGroups()
@@ -40,13 +41,38 @@ const DeviceGroups: React.FC = () => {
   const fetchGroups = async () => {
     setLoading(true)
     try {
-      const res = await listDeviceGroups()
+      const [res, nodeRes] = await Promise.all([listDeviceGroups(), listNodes()])
       setGroups(res.data || res)
+      setNodes(nodeRes.data || [])
     } catch {
       message.error('获取设备组列表失败')
     } finally {
       setLoading(false)
     }
+  }
+
+  const buildCommand = (token: string) => {
+    const path = releaseTag === 'latest' ? 'latest/download' : `download/${releaseTag}`
+    return `curl --proto '=https' --tlsv1.2 -fsSL https://github.com/CaydenTrudell7194/anotherpass/releases/${path}/install-node.sh | sudo bash -s -- --server '${window.location.origin}' --group-token '${token}'`
+  }
+  const showCommand = async (group: DeviceGroup) => {
+    try { setCommand(buildCommand((await getDeviceGroupNodeToken(group.id)).data.token)) }
+    catch { message.error('获取安装命令失败') }
+  }
+  const resetToken = async (group: DeviceGroup) => {
+    try {
+      const res = await resetDeviceGroupNodeToken(group.id)
+      setCommand(buildCommand(res.data.token))
+      message.success('Token 已重置，旧节点已断开')
+    } catch { message.error('重置失败') }
+  }
+  const copyCommand = async () => {
+    try { await navigator.clipboard.writeText(command); message.success('安装命令已复制') }
+    catch { message.warning('浏览器禁止自动复制，请手动复制弹窗中的命令') }
+  }
+  const removeNode = async (id: number) => {
+    try { await deleteNode(id); message.success('节点已删除'); fetchGroups() }
+    catch { message.error('删除节点失败') }
   }
 
   const handleAdd = () => {
@@ -129,12 +155,16 @@ const DeviceGroups: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 160,
+      width: 300,
       render: (_: any, record: DeviceGroup) => (
         <Space>
           <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             编辑
           </Button>
+          {TYPE_LABELS[record.type] && <Button type="link" icon={<CopyOutlined />} onClick={() => showCommand(record)}>安装命令</Button>}
+          {TYPE_LABELS[record.type] && <Popconfirm title="重置后所有旧节点需重新执行安装命令，确定？" onConfirm={() => resetToken(record)}>
+            <Button type="link" icon={<KeyOutlined />}>重置 Token</Button>
+          </Popconfirm>}
           <Popconfirm title="确定删除此设备组？" onConfirm={() => handleDelete(record.id)} okText="确定" cancelText="取消">
             <Button type="link" danger icon={<DeleteOutlined />}>
               删除
@@ -159,6 +189,18 @@ const DeviceGroups: React.FC = () => {
         loading={loading}
         pagination={{ pageSize: 20, showSizeChanger: true }}
         scroll={{ x: 1100 }}
+        expandable={{
+          expandedRowRender: group => {
+            const rows = nodes.filter(n => n.device_group_id === group.id)
+            return <Table size="small" rowKey="id" pagination={false} dataSource={rows} locale={{emptyText:'尚无节点，执行该组安装命令后自动登记'}} columns={[
+              {title:'节点',dataIndex:'name'},
+              {title:'IP',dataIndex:'ip',render:(v:string)=>v||'-'},
+              {title:'状态',dataIndex:'status',render:(v:string)=><Tag color={v==='online'?'green':'red'}>{v==='online'?'在线':'离线'}</Tag>},
+              {title:'实例ID',dataIndex:'instance_id',render:(v:string)=>v||'旧版节点'},
+              {title:'操作',render:(_:any,n:any)=><Popconfirm title="确定删除该节点记录？" onConfirm={()=>removeNode(n.id)}><Button danger type="link" icon={<DeleteOutlined />}>删除</Button></Popconfirm>}
+            ]} />
+          }
+        }}
       />
       <Modal
         title={editingGroup ? '编辑设备组' : '添加设备组'}
@@ -201,6 +243,10 @@ const DeviceGroups: React.FC = () => {
             <Input placeholder="例如: example.com:8080" />
           </Form.Item>
         </Form>
+      </Modal>
+      <Modal title="设备组节点安装命令" open={!!command} onCancel={()=>setCommand('')} footer={<Button type="primary" icon={<CopyOutlined />} onClick={copyCommand}>复制完整命令</Button>} width={760}>
+        <Input.TextArea value={command} readOnly autoSize={{minRows:5}} style={{fontFamily:'monospace'}} />
+        <div style={{marginTop:12,color:'#666'}}>该命令长期有效，可在多台服务器重复执行。每台服务器会自动登记为该设备组下的独立节点。</div>
       </Modal>
     </div>
   )

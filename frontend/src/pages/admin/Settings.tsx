@@ -29,7 +29,7 @@ export default function Settings() {
   }
   return (
     <div style={{ maxWidth: 1050, margin: '0 auto' }}>
-      <Alert type="info" showIcon style={{ marginBottom: 16 }} message="入口直出模式" description="本面板仅管理入口机直出规则，不包含出口机、商城、支付、邀请返利或出口故障转移设置。多台节点加入同一设备组时会共用该组规则。" />
+      <Alert type="info" showIcon style={{ marginBottom: 16 }} message="入口直出模式" description="本面板管理入口直出、套餐和人工订单；暂不包含支付、商城、邀请返利或出口故障转移。多台节点加入同一设备组时共用该组规则。" />
       <Form form={form} layout="vertical" onFinish={save}>
         <Card title={<><SettingOutlined /> 基本站点</>} style={{ marginBottom: 16 }}>
           <Row gutter={16}>
@@ -60,6 +60,12 @@ export default function Settings() {
             <Form.Item name="offline_node_retention_hours" label="离线节点保留展示（小时）"><InputNumber min={1} max={8760} precision={0} /></Form.Item>
           </Space>
           <div><Text type="secondary">设备组倍率、允许用户组、连接地址、排序和备注请在“设备组管理”中设置。</Text></div>
+        </Card>
+        <Card title="Telegram 通知" style={{ marginBottom: 16 }}>
+          <Alert type="info" showIcon style={{marginBottom:16}} message="Bot Token 通过服务器环境变量 TELEGRAM_BOT_TOKEN 配置，不会保存到数据库或发送到浏览器。" />
+          <Form.Item name="telegram_enabled" label="启用 Telegram 通知" valuePropName="checked"><Switch /></Form.Item>
+          <Form.Item name="telegram_chat_id" label="通知 Chat ID" rules={[{max:64}]}><Input placeholder="例如：-1001234567890" /></Form.Item>
+          <Form.Item shouldUpdate noStyle>{({getFieldValue}) => <Text type={getFieldValue('telegram_bot_configured')?'success':'warning'}>{getFieldValue('telegram_bot_configured')?'服务器已配置 Bot Token':'服务器尚未配置 Bot Token'}</Text>}</Form.Item>
         </Card>
         <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving} size="large">保存全部设置</Button>
       </Form>

@@ -93,7 +93,36 @@ func NodeWebSocket(c *gin.Context) {
 		return
 	}
 	var node model.Node
-	if err := model.DB.Where("token = ?", token).First(&node).Error; err != nil {
+	var group model.DeviceGroup
+	groupAuth := model.DB.Where("node_token = ?", token).First(&group).Error == nil
+	if groupAuth {
+		instanceID := strings.TrimSpace(c.GetHeader("X-Node-Instance"))
+		name := strings.TrimSpace(c.GetHeader("X-Node-Name"))
+		if instanceID == "" || len(instanceID) > 64 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "节点实例ID无效"})
+			return
+		}
+		if name == "" {
+			name = "入口节点"
+		}
+		if len(name) > 128 {
+			name = name[:128]
+		}
+		if err := model.DB.Where("device_group_id = ? AND instance_id = ?", group.ID, instanceID).First(&node).Error; err != nil {
+			internalToken, tokenErr := newDeviceGroupToken()
+			if tokenErr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "节点登记失败"})
+				return
+			}
+			node = model.Node{DeviceGroupID: group.ID, InstanceID: instanceID, Name: name, Token: internalToken, Status: "offline"}
+			if err := model.DB.Create(&node).Error; err != nil {
+				if err := model.DB.Where("device_group_id = ? AND instance_id = ?", group.ID, instanceID).First(&node).Error; err != nil {
+					c.JSON(http.StatusConflict, gin.H{"error": "节点登记失败"})
+					return
+				}
+			}
+		}
+	} else if err := model.DB.Where("token = ?", token).First(&node).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "节点认证失败"})
 		return
 	}
@@ -156,7 +185,16 @@ func NodeWebSocket(c *gin.Context) {
 			return
 		case <-ticker.C:
 			var current model.Node
-			if err := model.DB.First(&current, node.ID).Error; err != nil || current.Token != token || ensureDirectEntryGroup(current.DeviceGroupID) != nil {
+			if err := model.DB.First(&current, node.ID).Error; err != nil {
+				_ = session.writeJSON(nodeControlMessage{Type: "revoked"})
+				return
+			}
+			authValid := current.Token == token
+			if groupAuth {
+				var currentGroup model.DeviceGroup
+				authValid = model.DB.First(&currentGroup, node.DeviceGroupID).Error == nil && currentGroup.NodeToken == token
+			}
+			if !authValid || ensureDirectEntryGroup(current.DeviceGroupID) != nil {
 				_ = session.writeJSON(nodeControlMessage{Type: "revoked"})
 				return
 			}
@@ -174,5 +212,15 @@ func NodeWebSocket(c *gin.Context) {
 				lastSent = time.Now()
 			}
 		}
+	}
+}
+
+func revokeDeviceGroupSessions(groupID uint) {
+	var nodes []model.Node
+	if err := model.DB.Where("device_group_id = ?", groupID).Find(&nodes).Error; err != nil {
+		return
+	}
+	for _, node := range nodes {
+		revokeNodeSession(node.ID)
 	}
 }

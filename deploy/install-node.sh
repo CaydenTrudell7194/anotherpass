@@ -4,22 +4,22 @@ set -euo pipefail
 REPO="CaydenTrudell7194/anotherpass"
 VERSION="latest"
 SERVER=""
-ENROLL=""
+GROUP_TOKEN=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --server) SERVER="${2:-}"; shift 2 ;;
-    --enroll) ENROLL="${2:-}"; shift 2 ;;
+    --group-token) GROUP_TOKEN="${2:-}"; shift 2 ;;
     *) echo "未知参数: $1"; exit 1 ;;
   esac
 done
 
-if [ "${EUID}" -ne 0 ] || [ -z "$SERVER" ] || [ -z "$ENROLL" ]; then
-  echo "用法: bash install-node.sh --server https://panel.example.com --enroll <一次性注册码>"
+if [ "${EUID}" -ne 0 ] || [ -z "$SERVER" ] || [ -z "$GROUP_TOKEN" ]; then
+  echo "用法: bash install-node.sh --server https://panel.example.com --group-token <设备组Token>"
   exit 1
 fi
-if ! [[ "$SERVER" =~ ^https?://[A-Za-z0-9._:\[\]/-]+$ ]] || ! [[ "$ENROLL" =~ ^[a-f0-9]{48}$ ]]; then
-  echo "面板地址或一次性注册码格式无效"
+if ! [[ "$SERVER" =~ ^https?://[A-Za-z0-9._:\[\]/-]+$ ]] || ! [[ "$GROUP_TOKEN" =~ ^[a-f0-9]{64}$ ]]; then
+  echo "面板地址或设备组Token格式无效"
   exit 1
 fi
 
@@ -42,7 +42,7 @@ tar xzf "$TMP_DIR/nodeclient.tar.gz" -C /usr/local/bin/
 chmod 0755 /usr/local/bin/nodeclient
 
 umask 077
-/usr/local/bin/nodeclient --server "$SERVER" --enroll "$ENROLL" --output-config /etc/forward-node/config.json
+/usr/local/bin/nodeclient --server "$SERVER" --group-token "$GROUP_TOKEN" --output-config /etc/forward-node/config.json
 chmod 0600 /etc/forward-node/config.json
 
 cat > /etc/systemd/system/forward-node.service <<'EOF'

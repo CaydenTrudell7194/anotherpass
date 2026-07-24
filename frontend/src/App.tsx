@@ -10,9 +10,11 @@ import AdminDashboard from './pages/admin/Dashboard'
 import AdminUsers from './pages/admin/Users'
 import AdminUserGroups from './pages/admin/UserGroups'
 import AdminDeviceGroups from './pages/admin/DeviceGroups'
-import AdminNodes from './pages/admin/Nodes'
 import Register from './pages/Register'
 import AdminSettings from './pages/admin/Settings'
+import Plans from './pages/user/Plans'
+import AdminPlans from './pages/admin/Plans'
+import AdminOrders from './pages/admin/Orders'
 
 const isLoggedIn = () => !!localStorage.getItem('token')
 
@@ -32,12 +34,14 @@ export default function App() {
         <Route path="forward_rules" element={<ForwardRules />} />
         <Route path="device_group" element={<DeviceGroups />} />
         <Route path="node_status" element={<NodeStatus />} />
+        <Route path="plans" element={<Plans />} />
         <Route path="admin/dashboard" element={<AdminDashboard />} />
         <Route path="admin/settings" element={<AdminSettings />} />
         <Route path="admin/users" element={<AdminUsers />} />
         <Route path="admin/user_groups" element={<AdminUserGroups />} />
         <Route path="admin/device_groups" element={<AdminDeviceGroups />} />
-        <Route path="admin/nodes" element={<AdminNodes />} />
+        <Route path="admin/plans" element={<AdminPlans />} />
+        <Route path="admin/orders" element={<AdminOrders />} />
       </Route>
     </Routes>
   )

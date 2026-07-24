@@ -13,7 +13,10 @@ func InitDatabase(dbPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := DB.AutoMigrate(&User{}, &UserGroup{}, &DeviceGroup{}, &Node{}, &ForwardRule{}, &SystemConfig{}); err != nil {
+	if err := DB.AutoMigrate(&User{}, &UserGroup{}, &DeviceGroup{}, &Node{}, &ForwardRule{}, &SystemConfig{}, &ServicePlan{}, &Order{}); err != nil {
+		return err
+	}
+	if err := DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_nodes_group_instance_unique ON nodes(device_group_id, instance_id) WHERE instance_id <> ''").Error; err != nil {
 		return err
 	}
 	// Older releases created immediately-deployed rules with a pending status.

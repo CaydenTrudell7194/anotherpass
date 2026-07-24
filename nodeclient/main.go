@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,10 +36,13 @@ type ForwardRule struct {
 }
 
 type Config struct {
-	ServerURL string `json:"server_url"`
-	Token     string `json:"token"`
-	NodeID    int    `json:"node_id"`
-	DeviceID  int    `json:"device_id"`
+	ServerURL  string `json:"server_url"`
+	Token      string `json:"token,omitempty"`
+	GroupToken string `json:"group_token,omitempty"`
+	InstanceID string `json:"instance_id,omitempty"`
+	Name       string `json:"name,omitempty"`
+	NodeID     int    `json:"node_id,omitempty"`
+	DeviceID   int    `json:"device_id,omitempty"`
 }
 
 var (
@@ -58,11 +63,11 @@ var (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("用法: nodeclient --config <配置文件> 或 --server <面板地址> --token <节点令牌> [--device <设备组ID>]")
+		fmt.Println("用法: nodeclient --config <配置文件> 或 --server <面板地址> --group-token <设备组Token> --output-config <配置文件>")
 		os.Exit(1)
 	}
 
-	enrollCode := ""
+	groupToken := ""
 	outputConfig := ""
 	for i := 1; i < len(os.Args); i++ {
 		if i+1 >= len(os.Args) {
@@ -82,8 +87,8 @@ func main() {
 		case "--token":
 			config.Token = os.Args[i+1]
 			i++
-		case "--enroll":
-			enrollCode = os.Args[i+1]
+		case "--group-token":
+			groupToken = os.Args[i+1]
 			i++
 		case "--output-config":
 			outputConfig = os.Args[i+1]
@@ -107,20 +112,20 @@ func main() {
 		os.Exit(1)
 	}
 	config.ServerURL = strings.TrimRight(config.ServerURL, "/")
-	if enrollCode != "" {
+	if groupToken != "" {
 		if outputConfig == "" {
-			fmt.Println("注册码模式需要 --output-config")
+			fmt.Println("设备组Token模式需要 --output-config")
 			os.Exit(1)
 		}
-		if err := enrollNode(enrollCode, outputConfig); err != nil {
-			fmt.Printf("节点注册失败: %v\n", err)
+		if err := writeGroupConfig(groupToken, outputConfig); err != nil {
+			fmt.Printf("写入节点配置失败: %v\n", err)
 			os.Exit(1)
 		}
 		fmt.Println("节点凭据已写入安全配置文件")
 		return
 	}
 
-	if config.ServerURL == "" || config.Token == "" {
+	if config.ServerURL == "" || (config.Token == "" && config.GroupToken == "") {
 		fmt.Println("参数不完整")
 		os.Exit(1)
 	}
@@ -136,19 +141,23 @@ func main() {
 	stopAllProxies()
 }
 
-func enrollNode(code, outputPath string) error {
-	payload, _ := json.Marshal(map[string]string{"code": code})
-	body, status, err := httpPostWithBody(config.ServerURL+"/api/node/enroll", payload)
-	if err != nil {
-		return fmt.Errorf("HTTP %d: %w", status, err)
+func writeGroupConfig(groupToken, outputPath string) error {
+	instanceID := ""
+	if existing, err := os.ReadFile(outputPath); err == nil {
+		var saved Config
+		if json.Unmarshal(existing, &saved) == nil {
+			instanceID = saved.InstanceID
+		}
 	}
-	var result struct {
-		Token string `json:"token"`
+	if instanceID == "" {
+		b := make([]byte, 16)
+		if _, err := rand.Read(b); err != nil {
+			return err
+		}
+		instanceID = hex.EncodeToString(b)
 	}
-	if err := json.Unmarshal(body, &result); err != nil || result.Token == "" {
-		return errors.New("面板返回了无效的节点凭据")
-	}
-	data, _ := json.Marshal(Config{ServerURL: config.ServerURL, Token: result.Token})
+	name, _ := os.Hostname()
+	data, _ := json.Marshal(Config{ServerURL: config.ServerURL, GroupToken: groupToken, InstanceID: instanceID, Name: name})
 	if err := os.WriteFile(outputPath, append(data, '\n'), 0600); err != nil {
 		return err
 	}
@@ -209,7 +218,17 @@ func runWebSocketSession() (int, bool, error) {
 	}
 	base.Path = strings.TrimRight(base.Path, "/") + "/api/node/ws"
 	header := http.Header{}
-	header.Set("Authorization", "Bearer "+config.Token)
+	token := config.GroupToken
+	if token == "" {
+		token = config.Token
+	}
+	header.Set("Authorization", "Bearer "+token)
+	if config.InstanceID != "" {
+		header.Set("X-Node-Instance", config.InstanceID)
+	}
+	if config.Name != "" {
+		header.Set("X-Node-Name", config.Name)
+	}
 	conn, resp, err := websocket.DefaultDialer.Dial(base.String(), header)
 	if err != nil {
 		if resp != nil {

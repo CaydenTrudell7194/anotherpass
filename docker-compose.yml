@@ -12,6 +12,7 @@ services:
       - FRONTEND_DIR=/app/public
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
     volumes:
       - panel-data:/data
     networks:

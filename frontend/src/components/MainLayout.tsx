@@ -5,7 +5,7 @@ import type { MenuProps } from 'antd'
 import {
   HomeOutlined, UserOutlined, UnorderedListOutlined, DesktopOutlined,
   ApiOutlined, DashboardOutlined, SettingOutlined, TeamOutlined,
-  CloudServerOutlined, LogoutOutlined, MoonOutlined, SunOutlined
+  CloudServerOutlined, LogoutOutlined, MoonOutlined, SunOutlined, ShoppingOutlined, FileDoneOutlined
 } from '@ant-design/icons'
 import { getProfile } from '../api'
 import { useSite, useSiteBackground } from '../site'
@@ -19,6 +19,7 @@ const menuItems = (isAdmin: boolean): MenuProps['items'] => {
     { key: '/forward_rules', icon: <UnorderedListOutlined />, label: '转发规则' },
     { key: '/device_group', icon: <DesktopOutlined />, label: '单端隧道' },
     { key: '/node_status', icon: <ApiOutlined />, label: '节点状态' },
+    { key: '/plans', icon: <ShoppingOutlined />, label: '套餐与订单' },
   ]
   if (isAdmin) {
     items.push({
@@ -29,7 +30,8 @@ const menuItems = (isAdmin: boolean): MenuProps['items'] => {
         { key: '/admin/users', icon: <UserOutlined />, label: '用户管理' },
         { key: '/admin/user_groups', icon: <TeamOutlined />, label: '用户组管理' },
         { key: '/admin/device_groups', icon: <CloudServerOutlined />, label: '设备组管理' },
-        { key: '/admin/nodes', icon: <ApiOutlined />, label: '节点管理' },
+        { key: '/admin/plans', icon: <ShoppingOutlined />, label: '套餐管理' },
+        { key: '/admin/orders', icon: <FileDoneOutlined />, label: '订单审核' },
       ],
     } as MenuProps['items'][number])
   }

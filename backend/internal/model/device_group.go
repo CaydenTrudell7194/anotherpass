@@ -23,6 +23,7 @@ type DeviceGroup struct {
 	SortOrder      int             `gorm:"default:0" json:"sort_order"`
 	TrafficUsed    int64           `gorm:"default:0" json:"traffic_used"`
 	OnlineDevices  int             `gorm:"default:0" json:"online_devices"`
+	NodeToken      string          `gorm:"size:64;index" json:"-"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
 }
@@ -34,6 +35,7 @@ type Node struct {
 	Name          string      `gorm:"size:128" json:"name"`
 	IP            string      `gorm:"size:64" json:"ip"`
 	Token         string      `gorm:"size:256;uniqueIndex" json:"-"`
+	InstanceID    string      `gorm:"size:64;index" json:"instance_id"`
 	EnrollHash    string      `gorm:"size:64;index" json:"-"`
 	EnrollExpires time.Time   `json:"-"`
 	Status        string      `gorm:"size:16;default:offline" json:"status"`

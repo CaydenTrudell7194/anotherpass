@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
 	"strconv"
 	"strings"
@@ -54,11 +56,102 @@ func CreateDeviceGroup(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
 	}
+	if group.Type != model.DeviceGroupEntryForceDirect && group.Type != model.DeviceGroupEntryOptionalDirect {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "仅支持入口直出设备组"})
+		return
+	}
+	token, err := newDeviceGroupToken()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成节点令牌失败"})
+		return
+	}
+	group.NodeToken = token
 	if err := model.DB.Create(&group).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建失败"})
 		return
 	}
 	c.JSON(http.StatusOK, group)
+}
+
+func GetDeviceGroupNodeToken(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID无效"})
+		return
+	}
+	var group model.DeviceGroup
+	err = model.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.First(&group, id).Error; err != nil {
+			return err
+		}
+		if group.NodeToken != "" {
+			return nil
+		}
+		token, err := newDeviceGroupToken()
+		if err != nil {
+			return err
+		}
+		if err := tx.Model(&model.DeviceGroup{}).Where("id = ? AND node_token = ''", id).Update("node_token", token).Error; err != nil {
+			return err
+		}
+		return tx.First(&group, id).Error
+	})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "设备组不存在或令牌生成失败"})
+		return
+	}
+	c.Header("Cache-Control", "no-store, private")
+	c.JSON(http.StatusOK, gin.H{"token": group.NodeToken})
+}
+
+func ResetDeviceGroupNodeToken(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID无效"})
+		return
+	}
+	token, err := newDeviceGroupToken()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成节点令牌失败"})
+		return
+	}
+	err = model.DB.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&model.DeviceGroup{}).Where("id = ?", id).Update("node_token", token)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		var nodes []model.Node
+		if err := tx.Where("device_group_id = ?", id).Find(&nodes).Error; err != nil {
+			return err
+		}
+		for _, node := range nodes {
+			legacyToken, err := newDeviceGroupToken()
+			if err != nil {
+				return err
+			}
+			if err := tx.Model(&node).Updates(map[string]interface{}{"token": legacyToken, "enroll_hash": "", "enroll_expires": nil}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "重置失败"})
+		return
+	}
+	revokeDeviceGroupSessions(uint(id))
+	c.JSON(http.StatusOK, gin.H{"message": "节点接入 Token 已重置", "token": token})
+}
+
+func newDeviceGroupToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 func UpdateDeviceGroup(c *gin.Context) {
@@ -90,7 +183,12 @@ func UpdateDeviceGroup(c *gin.Context) {
 		orig.Name = *input.Name
 	}
 	if input.Type != nil {
-		orig.Type = model.DeviceGroupType(*input.Type)
+		t := model.DeviceGroupType(*input.Type)
+		if t != model.DeviceGroupEntryForceDirect && t != model.DeviceGroupEntryOptionalDirect {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "仅支持入口直出设备组"})
+			return
+		}
+		orig.Type = t
 	}
 	if input.UserGroupIDs != nil {
 		orig.UserGroupIDs = *input.UserGroupIDs

@@ -87,6 +87,15 @@ LEGACY_UPGRADE="n"
 if [ -f data.db ] && [ ! -f panel.env ]; then
   LEGACY_UPGRADE="y"
 fi
+TELEGRAM_TOKEN=""
+if [ ! -f panel.env ]; then
+  read -s -p "Telegram Bot Token（可留空，之后可在 panel.env 配置）: " TELEGRAM_TOKEN
+  echo ""
+  if [ -n "$TELEGRAM_TOKEN" ] && ! [[ "$TELEGRAM_TOKEN" =~ ^[A-Za-z0-9:_-]+$ ]]; then
+    echo -e "${RED}Telegram Bot Token 格式无效${NC}"
+    exit 1
+  fi
+fi
 if [ -f panel.env ]; then
   echo "检测到已有配置，将保留管理员密码和 JWT 密钥"
   ADMIN_PWD=""
@@ -99,6 +108,7 @@ elif [ "$LEGACY_UPGRADE" = "y" ]; then
 ADMIN_PASSWORD=${BOOTSTRAP_PWD}
 JWT_SECRET=${JWT_SECRET}
 DATABASE=sqlite3:///data/data.db
+TELEGRAM_BOT_TOKEN=${TELEGRAM_TOKEN}
 ENVEOF
 else
   read -s -p "设置管理员密码 (至少8位，仅支持字母、数字和常用符号): " ADMIN_PWD
@@ -112,6 +122,7 @@ else
 ADMIN_PASSWORD=${ADMIN_PWD}
 JWT_SECRET=${JWT_SECRET}
 DATABASE=sqlite3:///data/data.db
+TELEGRAM_BOT_TOKEN=${TELEGRAM_TOKEN}
 ENVEOF
 fi
 mkdir -p data caddy
@@ -230,5 +241,5 @@ fi
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "节点服务器对接:"
-echo -e "  ${YELLOW}登录管理后台 -> 节点管理 -> 添加节点服务器 -> 复制对接命令${NC}"
+echo -e "  ${YELLOW}登录管理后台 -> 设备组管理 -> 安装命令${NC}"
 echo "  同一设备组可添加多台服务器；同组节点通过 WebSocket 接收相同转发规则。"

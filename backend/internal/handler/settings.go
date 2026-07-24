@@ -30,6 +30,9 @@ type SiteSettings struct {
 	MobileBackgroundURL       string `json:"mobile_background_url"`
 	OfflineNodeSeconds        int    `json:"offline_node_seconds"`
 	OfflineNodeRetentionHours int    `json:"offline_node_retention_hours"`
+	TelegramEnabled           bool   `json:"telegram_enabled"`
+	TelegramChatID            string `json:"telegram_chat_id"`
+	TelegramBotConfigured     bool   `json:"telegram_bot_configured" gorm:"-"`
 }
 
 type PublicSiteInfo struct {
@@ -72,6 +75,8 @@ func normalizeSiteSettings(settings *SiteSettings) {
 	settings.SiteSubtitle = strings.TrimSpace(settings.SiteSubtitle)
 	settings.BackgroundURL = strings.TrimSpace(settings.BackgroundURL)
 	settings.MobileBackgroundURL = strings.TrimSpace(settings.MobileBackgroundURL)
+	settings.TelegramChatID = strings.TrimSpace(settings.TelegramChatID)
+	settings.TelegramBotConfigured = telegramBotToken() != ""
 	if settings.SiteName == "" {
 		settings.SiteName = "转发面板"
 	}
@@ -118,6 +123,9 @@ func validateSiteSettings(settings *SiteSettings) string {
 	if len(settings.BackgroundURL) > 1024 || len(settings.MobileBackgroundURL) > 1024 {
 		return "背景图URL过长"
 	}
+	if settings.TelegramEnabled && (settings.TelegramChatID == "" || len(settings.TelegramChatID) > 64 || telegramBotToken() == "") {
+		return "Telegram Bot Token 未配置或 Chat ID 无效"
+	}
 	var group model.UserGroup
 	if err := model.DB.First(&group, settings.RegisterUserGroupID).Error; err != nil {
 		return "注册默认用户组不存在"
@@ -146,6 +154,7 @@ func UpdateSiteSettings(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": msg})
 		return
 	}
+	settings.TelegramBotConfigured = false
 	value, err := json.Marshal(settings)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存失败"})
@@ -156,6 +165,7 @@ func UpdateSiteSettings(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存失败"})
 		return
 	}
+	settings.TelegramBotConfigured = telegramBotToken() != ""
 	c.JSON(http.StatusOK, settings)
 }
 
