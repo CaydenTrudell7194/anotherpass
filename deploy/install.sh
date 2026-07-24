@@ -77,20 +77,24 @@ mkdir -p caddy
 if [ -z "$DOMAIN" ] || is_ip "$DOMAIN"; then
   cat > caddy/Caddyfile << CADDYEOF
 :80 {
-  root * /opt/backend/public
-  try_files {path} /index.html
-  file_server
   reverse_proxy /api/* 127.0.0.1:18888
+  handle {
+    root * /opt/backend/public
+    try_files {path} /index.html
+    file_server
+  }
 }
 CADDYEOF
 elif [ "$USE_HTTPS" = "n" ]; then
   cat > caddy/Caddyfile << CADDYEOF
 ${DOMAIN}:80 {
-  root * /opt/backend/public
-  try_files {path} /index.html
-  file_server
   reverse_proxy /api/* 127.0.0.1:18888 {
     header_up X-Real-IP {http.request.header.CF-Connecting-IP}
+  }
+  handle {
+    root * /opt/backend/public
+    try_files {path} /index.html
+    file_server
   }
 }
 CADDYEOF
@@ -98,11 +102,13 @@ else
   cat > caddy/Caddyfile << CADDYEOF
 ${DOMAIN} {
   tls admin@${DOMAIN}
-  root * /opt/backend/public
-  try_files {path} /index.html
-  file_server
   reverse_proxy /api/* 127.0.0.1:18888 {
     header_up X-Real-IP {http.request.header.CF-Connecting-IP}
+  }
+  handle {
+    root * /opt/backend/public
+    try_files {path} /index.html
+    file_server
   }
 }
 CADDYEOF
