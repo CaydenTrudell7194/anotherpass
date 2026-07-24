@@ -124,7 +124,7 @@ const DeviceGroups: React.FC = () => {
         </Tooltip>
       ),
     },
-    { title: '在线设备', dataIndex: 'online_devices', key: 'online_devices' },
+    { title: '在线节点', dataIndex: 'online_devices', key: 'online_devices' },
     { title: '备注', dataIndex: 'notes', key: 'notes', render: (val: string) => val || '-' },
     {
       title: '操作',

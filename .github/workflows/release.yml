@@ -52,7 +52,7 @@ jobs:
         run: |
           cd frontend
           npm ci
-          npm run build
+          VITE_RELEASE_TAG=${GITHUB_REF_NAME} npm run build
           cp -r dist ../build/public
 
       - name: Upload Artifacts
@@ -79,6 +79,9 @@ jobs:
           mkdir -p release
           chmod 0755 artifacts/forward-panel-amd64/backend-linux-amd64 artifacts/forward-panel-amd64/nodeclient-linux-amd64
           chmod 0755 artifacts/forward-panel-arm64/backend-linux-arm64 artifacts/forward-panel-arm64/nodeclient-linux-arm64
+          cp deploy/install-node.sh install-node.sh
+          sed -i 's/^VERSION="latest"/VERSION="${{ github.ref_name }}"/' install-node.sh
+          chmod 0755 install-node.sh
 
           # 独立 nodeclient (amd64)
           cp artifacts/forward-panel-amd64/nodeclient-linux-amd64 release/nodeclient
@@ -123,3 +126,4 @@ jobs:
             forward-panel-all.tar.gz
             nodeclient-linux-amd64.tar.gz
             nodeclient-linux-arm64.tar.gz
+            install-node.sh

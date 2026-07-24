@@ -107,11 +107,15 @@ func main() {
 
 			admin.GET("/nodes", handler.ListNodeStatus)
 			admin.POST("/nodes/register", handler.RegisterNode)
+			admin.POST("/nodes/:id/setup", handler.GetNodeSetup)
+			admin.POST("/nodes/:id/rotate-token", handler.RotateNodeToken)
 			admin.DELETE("/nodes/:id", handler.DeleteNode)
 		}
 
 		api.POST("/node/heartbeat", handler.NodeHeartbeat)
 		api.POST("/node/rules", handler.GetNodeRules)
+		api.POST("/node/enroll", handler.EnrollNode)
+		api.GET("/node/ws", handler.NodeWebSocket)
 	}
 
 	log.Printf("面板启动，监听 %s", cfg.Listen)

@@ -11,11 +11,14 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 type ForwardRule struct {
@@ -54,23 +57,36 @@ var (
 )
 
 func main() {
-	if len(os.Args) < 4 {
-		fmt.Println("用法: nodeclient --server <面板地址> --token <节点令牌> --device <设备组ID>")
-		fmt.Println("示例: nodeclient --server https://your.domain --token xxxxx --device 1")
+	if len(os.Args) < 2 {
+		fmt.Println("用法: nodeclient --config <配置文件> 或 --server <面板地址> --token <节点令牌> [--device <设备组ID>]")
 		os.Exit(1)
 	}
 
+	enrollCode := ""
+	outputConfig := ""
 	for i := 1; i < len(os.Args); i++ {
 		if i+1 >= len(os.Args) {
 			fmt.Printf("参数 %s 缺少值\n", os.Args[i])
 			os.Exit(1)
 		}
 		switch os.Args[i] {
+		case "--config":
+			if err := loadConfig(os.Args[i+1]); err != nil {
+				fmt.Printf("读取配置失败: %v\n", err)
+				os.Exit(1)
+			}
+			i++
 		case "--server":
 			config.ServerURL = os.Args[i+1]
 			i++
 		case "--token":
 			config.Token = os.Args[i+1]
+			i++
+		case "--enroll":
+			enrollCode = os.Args[i+1]
+			i++
+		case "--output-config":
+			outputConfig = os.Args[i+1]
 			i++
 		case "--device":
 			var err error
@@ -91,16 +107,27 @@ func main() {
 		os.Exit(1)
 	}
 	config.ServerURL = strings.TrimRight(config.ServerURL, "/")
+	if enrollCode != "" {
+		if outputConfig == "" {
+			fmt.Println("注册码模式需要 --output-config")
+			os.Exit(1)
+		}
+		if err := enrollNode(enrollCode, outputConfig); err != nil {
+			fmt.Printf("节点注册失败: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("节点凭据已写入安全配置文件")
+		return
+	}
 
-	if config.ServerURL == "" || config.Token == "" || config.DeviceID == 0 {
+	if config.ServerURL == "" || config.Token == "" {
 		fmt.Println("参数不完整")
 		os.Exit(1)
 	}
 
-	fmt.Printf("节点客户端启动，面板: %s, 设备组: %d\n", config.ServerURL, config.DeviceID)
+	fmt.Printf("节点客户端启动，面板: %s\n", config.ServerURL)
 
-	go heartbeatLoop()
-	go pollRulesLoop()
+	go websocketControlLoop()
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
@@ -109,51 +136,134 @@ func main() {
 	stopAllProxies()
 }
 
-func heartbeatLoop() {
-	for {
-		ip := getOutboundIP()
-		payload := map[string]interface{}{
-			"token": config.Token,
-			"ip":    ip,
-		}
-		data, _ := json.Marshal(payload)
-		httpPost(config.ServerURL+"/api/node/heartbeat", data)
-		time.Sleep(30 * time.Second)
-	}
-}
-
-func pollRulesLoop() {
-	for {
-		rules, status, err := fetchRules()
-		if err == nil {
-			applyRules(rules)
-		} else {
-			fmt.Printf("获取规则失败: %v\n", err)
-			if status == http.StatusUnauthorized || status == http.StatusForbidden {
-				stopAllProxies()
-			}
-		}
-		time.Sleep(20 * time.Second)
-	}
-}
-
-func fetchRules() ([]ForwardRule, int, error) {
-	payload := map[string]interface{}{
-		"token":     config.Token,
-		"device_id": config.DeviceID,
-	}
-	data, _ := json.Marshal(payload)
-	resp, status, err := httpPostWithBody(config.ServerURL+"/api/node/rules", data)
+func enrollNode(code, outputPath string) error {
+	payload, _ := json.Marshal(map[string]string{"code": code})
+	body, status, err := httpPostWithBody(config.ServerURL+"/api/node/enroll", payload)
 	if err != nil {
-		return nil, status, err
+		return fmt.Errorf("HTTP %d: %w", status, err)
 	}
 	var result struct {
-		Rules []ForwardRule `json:"rules"`
+		Token string `json:"token"`
 	}
-	if err := json.Unmarshal(resp, &result); err != nil {
-		return nil, status, err
+	if err := json.Unmarshal(body, &result); err != nil || result.Token == "" {
+		return errors.New("面板返回了无效的节点凭据")
 	}
-	return result.Rules, status, nil
+	data, _ := json.Marshal(Config{ServerURL: config.ServerURL, Token: result.Token})
+	if err := os.WriteFile(outputPath, append(data, '\n'), 0600); err != nil {
+		return err
+	}
+	return os.Chmod(outputPath, 0600)
+}
+
+func loadConfig(path string) error {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, &config)
+}
+
+type controlMessage struct {
+	Type             string        `json:"type"`
+	IP               string        `json:"ip,omitempty"`
+	NodeID           int           `json:"node_id,omitempty"`
+	DeviceGroupID    int           `json:"device_group_id,omitempty"`
+	HeartbeatSeconds int           `json:"heartbeat_seconds,omitempty"`
+	Rules            []ForwardRule `json:"rules,omitempty"`
+}
+
+func websocketControlLoop() {
+	backoff := time.Second
+	for {
+		status, connected, err := runWebSocketSession()
+		if err != nil {
+			fmt.Printf("WebSocket 连接断开: %v\n", err)
+		}
+		if status == http.StatusUnauthorized || status == http.StatusForbidden {
+			stopAllProxies()
+		}
+		if connected {
+			stopAllProxies()
+			backoff = time.Second
+		}
+		time.Sleep(backoff)
+		if backoff < 30*time.Second {
+			backoff *= 2
+		}
+		if backoff > 30*time.Second {
+			backoff = 30 * time.Second
+		}
+	}
+}
+
+func runWebSocketSession() (int, bool, error) {
+	base, _ := url.Parse(config.ServerURL)
+	if base.Scheme == "https" {
+		base.Scheme = "wss"
+	} else {
+		base.Scheme = "ws"
+	}
+	base.Path = strings.TrimRight(base.Path, "/") + "/api/node/ws"
+	header := http.Header{}
+	header.Set("Authorization", "Bearer "+config.Token)
+	conn, resp, err := websocket.DefaultDialer.Dial(base.String(), header)
+	if err != nil {
+		if resp != nil {
+			return resp.StatusCode, false, err
+		}
+		return 0, false, err
+	}
+	defer conn.Close()
+	backoffMessage := make(chan controlMessage, 8)
+	errCh := make(chan error, 1)
+	go func() {
+		for {
+			var msg controlMessage
+			if err := conn.ReadJSON(&msg); err != nil {
+				errCh <- err
+				return
+			}
+			select {
+			case backoffMessage <- msg:
+			default:
+				errCh <- errors.New("control message backlog")
+				return
+			}
+		}
+	}()
+	heartbeatSeconds := 15
+	ticker := time.NewTicker(time.Duration(heartbeatSeconds) * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case err := <-errCh:
+			return 0, true, err
+		case msg := <-backoffMessage:
+			switch msg.Type {
+			case "hello":
+				config.NodeID = msg.NodeID
+				config.DeviceID = msg.DeviceGroupID
+				if msg.HeartbeatSeconds >= 5 && msg.HeartbeatSeconds != heartbeatSeconds {
+					heartbeatSeconds = msg.HeartbeatSeconds
+					ticker.Reset(time.Duration(heartbeatSeconds) * time.Second)
+				}
+				fmt.Printf("WebSocket 已连接，节点ID: %d, 设备组: %d\n", config.NodeID, config.DeviceID)
+			case "rules_snapshot":
+				applyRules(msg.Rules)
+			case "revoked":
+				stopAllProxies()
+				return http.StatusForbidden, true, errors.New("节点凭据已撤销")
+			}
+		case <-ticker.C:
+			if err := conn.WriteJSON(controlMessage{Type: "heartbeat", IP: getOutboundIP()}); err != nil {
+				return 0, true, err
+			}
+		}
+	}
 }
 
 func applyRules(rules []ForwardRule) {
@@ -338,18 +448,6 @@ func httpGet(url string) []byte {
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	return body
-}
-
-func httpPost(url string, data []byte) {
-	resp, err := httpClient.Post(url, "application/json", bytes.NewReader(data))
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		fmt.Printf("心跳失败: HTTP %d\n", resp.StatusCode)
-	}
 }
 
 func httpPostWithBody(url string, data []byte) ([]byte, int, error) {

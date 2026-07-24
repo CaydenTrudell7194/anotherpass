@@ -229,10 +229,6 @@ else
 fi
 echo -e "${GREEN}========================================${NC}"
 echo ""
-NODE_PROTO="https://"
-[ -z "$DOMAIN" ] || is_ip "$DOMAIN" && NODE_PROTO="http://"
-echo "节点客户端安装命令 (在入口机运行):"
-echo -e "  ${YELLOW}ARCH=\$(case \$(uname -m) in x86_64|amd64) echo amd64;; aarch64|arm64) echo arm64;; esac); curl -fL https://github.com/${REPO}/releases/latest/download/nodeclient-linux-\${ARCH}.tar.gz -o /tmp/nc.tar.gz && tar xzf /tmp/nc.tar.gz -C /usr/local/bin/ && chmod +x /usr/local/bin/nodeclient${NC}"
-echo ""
-echo "对接入口机:"
-echo -e "  ${YELLOW}nodeclient --server ${NODE_PROTO}${ADDR} --token <节点令牌> --device <设备组ID>${NC}"
+echo "节点服务器对接:"
+echo -e "  ${YELLOW}登录管理后台 -> 节点管理 -> 添加节点服务器 -> 复制对接命令${NC}"
+echo "  同一设备组可添加多台服务器；同组节点通过 WebSocket 接收相同转发规则。"

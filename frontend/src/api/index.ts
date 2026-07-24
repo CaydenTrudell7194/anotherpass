@@ -61,6 +61,8 @@ export const deleteDeviceGroup = (id: number) => api.delete(`/admin/device_group
 
 export const listNodes = () => api.get('/admin/nodes')
 export const registerNode = (data: any) => api.post('/admin/nodes/register', data)
+export const getNodeSetup = (id: number) => api.post(`/admin/nodes/${id}/setup`)
+export const rotateNodeToken = (id: number) => api.post(`/admin/nodes/${id}/rotate-token`)
 export const deleteNode = (id: number) => api.delete(`/admin/nodes/${id}`)
 
 export const nodeHeartbeat = (token: string, ip: string) =>
