@@ -17,21 +17,29 @@ import (
 var errUserHasCommerceHistory = errors.New("user has commerce history")
 
 func AdminDashboard(c *gin.Context) {
-	var userCount, ruleCount, groupCount, nodeCount int64
+	var userCount, activeUserCount, ruleCount, groupCount, nodeCount, orderCount, approvedCount int64
 	model.DB.Model(&model.User{}).Count(&userCount)
+	model.DB.Model(&model.User{}).Where("status = ?", "active").Count(&activeUserCount)
 	model.DB.Model(&model.ForwardRule{}).Count(&ruleCount)
 	model.DB.Model(&model.DeviceGroup{}).Count(&groupCount)
 	model.DB.Model(&model.Node{}).Where("status = ?", "online").Count(&nodeCount)
+	model.DB.Model(&model.Order{}).Count(&orderCount)
+	model.DB.Model(&model.Order{}).Where("status = ?", "approved").Count(&approvedCount)
 
-	var totalTraffic int64
+	var totalTraffic, totalRechargeCents int64
 	model.DB.Model(&model.ForwardRule{}).Select("COALESCE(SUM(traffic), 0)").Scan(&totalTraffic)
+	model.DB.Model(&model.RechargeOrder{}).Where("status = ?", "paid").Select("COALESCE(SUM(amount_cents), 0)").Scan(&totalRechargeCents)
 
 	c.JSON(http.StatusOK, gin.H{
-		"user_count":         userCount,
-		"rule_count":         ruleCount,
-		"device_group_count": groupCount,
-		"online_node_count":  nodeCount,
-		"total_traffic":      totalTraffic,
+		"user_count":           userCount,
+		"active_user_count":    activeUserCount,
+		"rule_count":           ruleCount,
+		"device_group_count":   groupCount,
+		"online_node_count":    nodeCount,
+		"total_traffic":        totalTraffic,
+		"total_orders":         orderCount,
+		"approved_orders":      approvedCount,
+		"total_recharge_cents": totalRechargeCents,
 	})
 }
 

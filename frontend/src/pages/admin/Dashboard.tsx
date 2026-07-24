@@ -1,14 +1,22 @@
 import React, { useEffect, useState } from 'react'
 import { Card, Col, Row, Statistic, Spin, message } from 'antd'
-import { UserOutlined, SwapOutlined, AppstoreOutlined, ApiOutlined } from '@ant-design/icons'
+import {
+  UserOutlined, SwapOutlined, AppstoreOutlined, ApiOutlined,
+  TeamOutlined, ShoppingCartOutlined, CheckCircleOutlined,
+  DashboardOutlined, DollarOutlined
+} from '@ant-design/icons'
 import { adminDashboard } from '../../api'
 
 interface DashboardData {
   user_count: number
+  active_user_count: number
   rule_count: number
   device_group_count: number
   online_node_count: number
+  total_orders: number
+  approved_orders: number
   total_traffic: number
+  total_recharge_cents: number
 }
 
 const Dashboard: React.FC = () => {
@@ -45,12 +53,19 @@ const Dashboard: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
+  const formatYuan = (cents: number) => '¥' + (cents / 100).toFixed(2)
+
   return (
     <div>
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>
           <Card hoverable>
             <Statistic title="用户数" value={data.user_count} prefix={<UserOutlined />} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card hoverable>
+            <Statistic title="活跃用户数" value={data.active_user_count} prefix={<TeamOutlined />} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
@@ -68,11 +83,24 @@ const Dashboard: React.FC = () => {
             <Statistic title="在线节点数" value={data.online_node_count} prefix={<ApiOutlined />} />
           </Card>
         </Col>
-      </Row>
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col xs={24} sm={12}>
-          <Card title="流量概览">
-            <Statistic title="总流量" value={formatBytes(data.total_traffic)} />
+        <Col xs={24} sm={12} lg={6}>
+          <Card hoverable>
+            <Statistic title="总订单数" value={data.total_orders} prefix={<ShoppingCartOutlined />} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card hoverable>
+            <Statistic title="已审核订单" value={data.approved_orders} prefix={<CheckCircleOutlined />} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card hoverable>
+            <Statistic title="总流量" value={formatBytes(data.total_traffic)} prefix={<DashboardOutlined />} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card hoverable>
+            <Statistic title="充值总额" value={formatYuan(data.total_recharge_cents)} prefix={<DollarOutlined />} />
           </Card>
         </Col>
       </Row>

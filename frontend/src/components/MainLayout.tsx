@@ -5,7 +5,8 @@ import type { MenuProps } from 'antd'
 import {
   HomeOutlined, UserOutlined, UnorderedListOutlined, DesktopOutlined,
   ApiOutlined, DashboardOutlined, SettingOutlined, TeamOutlined,
-  CloudServerOutlined, LogoutOutlined, MoonOutlined, SunOutlined, ShoppingOutlined, FileDoneOutlined
+  CloudServerOutlined, LogoutOutlined, MoonOutlined, SunOutlined, ShoppingOutlined, FileDoneOutlined,
+  GiftOutlined, DollarOutlined
 } from '@ant-design/icons'
 import { getProfile } from '../api'
 import { useSite, useSiteBackground } from '../site'
@@ -20,6 +21,7 @@ const menuItems = (isAdmin: boolean): MenuProps['items'] => {
     { key: '/device_group', icon: <DesktopOutlined />, label: '单端隧道' },
     { key: '/my_servers', icon: <CloudServerOutlined />, label: '我的服务器' },
     { key: '/node_status', icon: <ApiOutlined />, label: '节点状态' },
+    { key: '/affiliate', icon: <GiftOutlined />, label: '推广返利' },
     { key: '/plans', icon: <ShoppingOutlined />, label: '套餐与订单' },
   ]
   if (isAdmin) {
@@ -33,6 +35,8 @@ const menuItems = (isAdmin: boolean): MenuProps['items'] => {
         { key: '/admin/device_groups', icon: <CloudServerOutlined />, label: '设备组管理' },
         { key: '/admin/plans', icon: <ShoppingOutlined />, label: '套餐管理' },
         { key: '/admin/orders', icon: <FileDoneOutlined />, label: '订单审核' },
+        { key: '/admin/redeem-codes', icon: <DollarOutlined />, label: '兑换码管理' },
+        { key: '/admin/affiliates', icon: <TeamOutlined />, label: '推广管理' },
       ],
     } as MenuProps['items'][number])
   }

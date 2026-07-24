@@ -92,3 +92,10 @@ export const adminListBalanceLedger = (userId: number) => api.get(`/admin/users/
 
 export const nodeHeartbeat = (token: string, ip: string) =>
   api.post('/node/heartbeat', { token, ip })
+
+export const getAffiliateInfo = () => api.get('/affiliate/info')
+export const redeemCode = (code: string) => api.post('/redeem', { code })
+export const adminListAffiliates = () => api.get('/admin/affiliates')
+export const adminCreateRedeemCodes = (data: any) => api.post('/admin/redeem-codes', data)
+export const adminListRedeemCodes = () => api.get('/admin/redeem-codes')
+export const adminDeleteRedeemCode = (id: number) => api.delete(`/admin/redeem-codes/${id}`)

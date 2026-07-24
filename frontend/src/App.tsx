@@ -16,6 +16,9 @@ import AdminSettings from './pages/admin/Settings'
 import Plans from './pages/user/Plans'
 import AdminPlans from './pages/admin/Plans'
 import AdminOrders from './pages/admin/Orders'
+import Affiliate from './pages/user/Affiliate'
+import RedeemCodes from './pages/admin/RedeemCodes'
+import AdminAffiliates from './pages/admin/Affiliates'
 
 const isLoggedIn = () => !!localStorage.getItem('token')
 
@@ -37,6 +40,7 @@ export default function App() {
         <Route path="my_servers" element={<MyServers />} />
         <Route path="node_status" element={<NodeStatus />} />
         <Route path="plans" element={<Plans />} />
+        <Route path="affiliate" element={<Affiliate />} />
         <Route path="admin/dashboard" element={<AdminDashboard />} />
         <Route path="admin/settings" element={<AdminSettings />} />
         <Route path="admin/users" element={<AdminUsers />} />
@@ -44,6 +48,8 @@ export default function App() {
         <Route path="admin/device_groups" element={<AdminDeviceGroups />} />
         <Route path="admin/plans" element={<AdminPlans />} />
         <Route path="admin/orders" element={<AdminOrders />} />
+        <Route path="admin/redeem-codes" element={<RedeemCodes />} />
+        <Route path="admin/affiliates" element={<AdminAffiliates />} />
       </Route>
     </Routes>
   )

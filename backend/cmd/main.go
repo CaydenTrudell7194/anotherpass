@@ -106,6 +106,9 @@ func main() {
 			auth.GET("/user-nodes", handler.ListUserNodes)
 			auth.GET("/user-nodes/:id/setup", handler.GetUserNodeSetup)
 			auth.DELETE("/user-nodes/:id", handler.DeleteUserNode)
+
+			auth.GET("/affiliate/info", handler.GetAffiliateInfo)
+			auth.POST("/redeem", handler.RedeemCodeHandler)
 		}
 
 		admin := api.Group("/admin")
@@ -150,6 +153,11 @@ func main() {
 
 			admin.GET("/user-nodes", handler.AdminListAllUserNodes)
 			admin.DELETE("/user-nodes/:id", handler.AdminDeleteUserNode)
+
+			admin.GET("/affiliates", handler.AdminListAffiliates)
+			admin.POST("/redeem-codes", handler.AdminCreateRedeemCodes)
+			admin.GET("/redeem-codes", handler.AdminListRedeemCodes)
+			admin.DELETE("/redeem-codes/:id", handler.AdminDeleteRedeemCode)
 		}
 
 		api.POST("/node/heartbeat", handler.NodeHeartbeat)
