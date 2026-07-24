@@ -69,13 +69,10 @@ if [ -n "$DOMAIN" ] && ! is_ip "$DOMAIN"; then
   read -p "启用 HTTPS (Let's Encrypt)? (Y/n) 选n则仅HTTP，可用于套CDN回源: " USE_HTTPS
   USE_HTTPS="${USE_HTTPS:-y}"
 fi
-read -p "设置管理员密码 (留空默认 admin123): " ADMIN_PWD
-ADMIN_PWD="${ADMIN_PWD:-admin123}"
+read -p "设置管理员密码 (留空默认 admin): " ADMIN_PWD
+ADMIN_PWD="${ADMIN_PWD:-admin}"
 
-echo -e "${YELLOW}[4/6] 初始化数据库...${NC}"
-MIGRATE=1 ADMIN="admin" ./backend 2>/dev/null || true
-
-echo -e "${YELLOW}[5/6] 配置 Caddy 反向代理...${NC}"
+echo -e "${YELLOW}[4/6] 配置 Caddy 反向代理...${NC}"
 mkdir -p caddy
 if [ -z "$DOMAIN" ] || is_ip "$DOMAIN"; then
   cat > caddy/Caddyfile << CADDYEOF
@@ -125,6 +122,7 @@ services:
     environment:
       - LISTEN=127.0.0.1:18888
       - DATABASE=sqlite3:///opt/backend/data.db
+      - ADMIN_PASSWORD=${ADMIN_PWD}
     logging:
       driver: "json-file"
       options:

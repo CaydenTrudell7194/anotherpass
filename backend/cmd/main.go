@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"forward-panel/internal/config"
@@ -115,7 +116,11 @@ func initDefaults() {
 
 	model.DB.Model(&model.User{}).Count(&count)
 	if count == 0 {
-		hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+		adminPwd := os.Getenv("ADMIN_PASSWORD")
+		if adminPwd == "" {
+			adminPwd = "admin"
+		}
+		hash, _ := bcrypt.GenerateFromPassword([]byte(adminPwd), bcrypt.DefaultCost)
 		model.DB.Create(&model.User{
 			Username:    "admin",
 			Password:    string(hash),
@@ -127,7 +132,7 @@ func initDefaults() {
 			RuleLimit:   9999,
 		})
 		fmt.Println("========================================")
-		fmt.Println("  默认管理员: admin / admin")
+		fmt.Println("  默认管理员: admin / " + adminPwd)
 		fmt.Println("========================================")
 	}
 }
