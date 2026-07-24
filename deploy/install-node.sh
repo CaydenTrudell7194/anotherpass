@@ -18,8 +18,12 @@ if [ "${EUID}" -ne 0 ] || [ -z "$SERVER" ] || [ -z "$GROUP_TOKEN" ]; then
   echo "用法: bash install-node.sh --server https://panel.example.com --group-token <设备组Token>"
   exit 1
 fi
-if ! [[ "$SERVER" =~ ^https?://[A-Za-z0-9._:\[\]/-]+$ ]] || ! [[ "$GROUP_TOKEN" =~ ^[a-f0-9]{64}$ ]]; then
-  echo "面板地址或设备组Token格式无效"
+case "$SERVER" in
+  http://*|https://*) ;;
+  *) echo "面板地址必须以 http:// 或 https:// 开头"; exit 1 ;;
+esac
+if ! [[ "$GROUP_TOKEN" =~ ^[a-f0-9]{64}$ ]]; then
+  echo "设备组Token格式无效，必须是64位小写十六进制字符串"
   exit 1
 fi
 
