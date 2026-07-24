@@ -148,6 +148,7 @@ volumes:
 DOCKEREOF
 
 echo -e "${YELLOW}[6/6] 启动服务...${NC}"
+docker compose down 2>/dev/null || true
 docker compose up -d
 
 PROTO="https://"
