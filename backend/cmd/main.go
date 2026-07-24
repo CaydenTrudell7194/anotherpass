@@ -86,6 +86,7 @@ func main() {
 
 			auth.GET("/device_groups", handler.ListMyDeviceGroups)
 			auth.GET("/nodes", handler.ListMyNodeStatus)
+			auth.POST("/node-monitor/ticket", handler.CreateNodeMonitorTicket)
 			auth.GET("/plans", handler.ListServicePlans)
 			auth.GET("/orders", handler.ListOrders)
 			auth.POST("/orders", handler.CreateOrder)
@@ -147,6 +148,7 @@ func main() {
 		api.POST("/node/rules", handler.GetNodeRules)
 		api.POST("/node/enroll", handler.EnrollNode)
 		api.GET("/node/ws", handler.NodeWebSocket)
+		api.GET("/node-monitor/ws", handler.NodeMonitorWebSocket)
 	}
 
 	log.Printf("面板启动，监听 %s", cfg.Listen)

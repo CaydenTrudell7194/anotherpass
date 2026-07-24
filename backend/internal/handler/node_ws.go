@@ -20,6 +20,35 @@ type nodeControlMessage struct {
 	DeviceGroupID    uint                `json:"device_group_id,omitempty"`
 	HeartbeatSeconds int                 `json:"heartbeat_seconds,omitempty"`
 	Rules            []model.ForwardRule `json:"rules,omitempty"`
+	Metrics          *nodeMetrics        `json:"metrics,omitempty"`
+}
+
+type nodeMetrics struct {
+	Hostname        string  `json:"hostname"`
+	Platform        string  `json:"platform"`
+	PlatformVersion string  `json:"platform_version"`
+	Arch            string  `json:"arch"`
+	Version         string  `json:"version"`
+	CPUModel        string  `json:"cpu_model"`
+	CPUPercent      float64 `json:"cpu_percent"`
+	Load1           float64 `json:"load1"`
+	Load5           float64 `json:"load5"`
+	Load15          float64 `json:"load15"`
+	ProcessCount    int     `json:"process_count"`
+	MemTotal        int64   `json:"mem_total"`
+	MemUsed         int64   `json:"mem_used"`
+	SwapTotal       int64   `json:"swap_total"`
+	SwapUsed        int64   `json:"swap_used"`
+	DiskTotal       int64   `json:"disk_total"`
+	DiskUsed        int64   `json:"disk_used"`
+	NetInSpeed      int64   `json:"net_in_speed"`
+	NetOutSpeed     int64   `json:"net_out_speed"`
+	NetInTransfer   int64   `json:"net_in_transfer"`
+	NetOutTransfer  int64   `json:"net_out_transfer"`
+	TCPConnCount    int     `json:"tcp_conn_count"`
+	UDPConnCount    int     `json:"udp_conn_count"`
+	UptimeSeconds   int64   `json:"uptime_seconds"`
+	BootTime        int64   `json:"boot_time"`
 }
 
 var nodeUpgrader = websocket.Upgrader{
@@ -144,7 +173,7 @@ func NodeWebSocket(c *gin.Context) {
 	conn.SetReadLimit(64 << 10)
 	_ = conn.SetReadDeadline(time.Now().Add(50 * time.Second))
 
-	if err := session.writeJSON(nodeControlMessage{Type: "hello", NodeID: node.ID, DeviceGroupID: node.DeviceGroupID, HeartbeatSeconds: 15}); err != nil {
+	if err := session.writeJSON(nodeControlMessage{Type: "hello", NodeID: node.ID, DeviceGroupID: node.DeviceGroupID, HeartbeatSeconds: 1}); err != nil {
 		return
 	}
 	rules, err := loadRulesForGroup(node.DeviceGroupID)
@@ -160,6 +189,7 @@ func NodeWebSocket(c *gin.Context) {
 	updateNodeHeartbeat(&node, node.IP)
 
 	done := make(chan struct{})
+	lastDBHeartbeat := time.Time{}
 	go func() {
 		defer close(done)
 		for {
@@ -172,7 +202,11 @@ func NodeWebSocket(c *gin.Context) {
 					return
 				}
 				_ = conn.SetReadDeadline(time.Now().Add(50 * time.Second))
-				updateNodeHeartbeat(&node, msg.IP)
+				updateNodeMonitor(node, msg.Metrics)
+				if time.Since(lastDBHeartbeat) >= 10*time.Second {
+					updateNodeHeartbeat(&node, msg.IP)
+					lastDBHeartbeat = time.Now()
+				}
 			}
 		}
 	}()

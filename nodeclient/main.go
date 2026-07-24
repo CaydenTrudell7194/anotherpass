@@ -23,6 +23,36 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const clientVersion = "v1.5.0"
+
+type MonitorMetrics struct {
+	Hostname        string  `json:"hostname"`
+	Platform        string  `json:"platform"`
+	PlatformVersion string  `json:"platform_version"`
+	Arch            string  `json:"arch"`
+	Version         string  `json:"version"`
+	CPUModel        string  `json:"cpu_model"`
+	CPUPercent      float64 `json:"cpu_percent"`
+	Load1           float64 `json:"load1"`
+	Load5           float64 `json:"load5"`
+	Load15          float64 `json:"load15"`
+	ProcessCount    uint64  `json:"process_count"`
+	MemTotal        uint64  `json:"mem_total"`
+	MemUsed         uint64  `json:"mem_used"`
+	SwapTotal       uint64  `json:"swap_total"`
+	SwapUsed        uint64  `json:"swap_used"`
+	DiskTotal       uint64  `json:"disk_total"`
+	DiskUsed        uint64  `json:"disk_used"`
+	NetInSpeed      uint64  `json:"net_in_speed"`
+	NetOutSpeed     uint64  `json:"net_out_speed"`
+	NetInTransfer   uint64  `json:"net_in_transfer"`
+	NetOutTransfer  uint64  `json:"net_out_transfer"`
+	TCPConnCount    uint64  `json:"tcp_conn_count"`
+	UDPConnCount    uint64  `json:"udp_conn_count"`
+	UptimeSeconds   uint64  `json:"uptime_seconds"`
+	BootTime        uint64  `json:"boot_time"`
+}
+
 type ForwardRule struct {
 	ID            int    `json:"id"`
 	Name          string `json:"name"`
@@ -177,12 +207,13 @@ func loadConfig(path string) error {
 }
 
 type controlMessage struct {
-	Type             string        `json:"type"`
-	IP               string        `json:"ip,omitempty"`
-	NodeID           int           `json:"node_id,omitempty"`
-	DeviceGroupID    int           `json:"device_group_id,omitempty"`
-	HeartbeatSeconds int           `json:"heartbeat_seconds,omitempty"`
-	Rules            []ForwardRule `json:"rules,omitempty"`
+	Type             string          `json:"type"`
+	IP               string          `json:"ip,omitempty"`
+	NodeID           int             `json:"node_id,omitempty"`
+	DeviceGroupID    int             `json:"device_group_id,omitempty"`
+	HeartbeatSeconds int             `json:"heartbeat_seconds,omitempty"`
+	Rules            []ForwardRule   `json:"rules,omitempty"`
+	Metrics          *MonitorMetrics `json:"metrics,omitempty"`
 }
 
 func websocketControlLoop() {
@@ -266,7 +297,7 @@ func runWebSocketSession() (int, bool, error) {
 			case "hello":
 				config.NodeID = msg.NodeID
 				config.DeviceID = msg.DeviceGroupID
-				if msg.HeartbeatSeconds >= 5 && msg.HeartbeatSeconds != heartbeatSeconds {
+				if msg.HeartbeatSeconds > 0 && msg.HeartbeatSeconds != heartbeatSeconds {
 					heartbeatSeconds = msg.HeartbeatSeconds
 					ticker.Reset(time.Duration(heartbeatSeconds) * time.Second)
 				}
@@ -278,7 +309,8 @@ func runWebSocketSession() (int, bool, error) {
 				return http.StatusForbidden, true, errors.New("节点凭据已撤销")
 			}
 		case <-ticker.C:
-			if err := conn.WriteJSON(controlMessage{Type: "heartbeat", IP: getOutboundIP()}); err != nil {
+			metrics := collectMonitorMetrics()
+			if err := conn.WriteJSON(controlMessage{Type: "heartbeat", IP: getOutboundIP(), Metrics: &metrics}); err != nil {
 				return 0, true, err
 			}
 		}
