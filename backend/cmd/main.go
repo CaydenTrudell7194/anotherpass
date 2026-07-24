@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"forward-panel/internal/config"
@@ -23,6 +24,7 @@ func main() {
 	if len(dsn) > 9 && dsn[:9] == "sqlite3://" {
 		dsn = dsn[9:]
 	}
+	os.MkdirAll(filepath.Dir(dsn), 0755)
 	if err := model.InitDatabase(dsn); err != nil {
 		log.Fatalf("数据库初始化失败: %v", err)
 	}

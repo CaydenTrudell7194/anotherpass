@@ -118,7 +118,7 @@ services:
     volumes:
       - ${INSTALL_DIR}:/opt/backend
     working_dir: /opt/backend
-    command: /opt/backend/backend
+    command: sh -c "mkdir -p /opt/backend && /opt/backend/backend"
     environment:
       - LISTEN=127.0.0.1:18888
       - DATABASE=sqlite3:///opt/backend/data.db
