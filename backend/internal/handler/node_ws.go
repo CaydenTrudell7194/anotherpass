@@ -115,10 +115,119 @@ func revokeNodeSession(nodeID uint) {
 	}
 }
 
+var activeUserNodeSessions = struct {
+	sync.Mutex
+	items map[uint]*nodeSession
+}{items: make(map[uint]*nodeSession)}
+
+func registerUserNodeSession(nodeID uint, session *nodeSession) bool {
+	activeUserNodeSessions.Lock()
+	defer activeUserNodeSessions.Unlock()
+	if activeUserNodeSessions.items[nodeID] != nil {
+		return false
+	}
+	activeUserNodeSessions.items[nodeID] = session
+	return true
+}
+
+func unregisterUserNodeSession(nodeID uint, session *nodeSession) {
+	activeUserNodeSessions.Lock()
+	if activeUserNodeSessions.items[nodeID] == session {
+		delete(activeUserNodeSessions.items, nodeID)
+		activeUserNodeSessions.Unlock()
+		markUserNodeOffline(nodeID)
+		return
+	}
+	activeUserNodeSessions.Unlock()
+}
+
+func currentUserNodeSession(nodeID uint, session *nodeSession) bool {
+	activeUserNodeSessions.Lock()
+	defer activeUserNodeSessions.Unlock()
+	return activeUserNodeSessions.items[nodeID] == session
+}
+
+func revokeUserNodeSession(nodeID uint) {
+	activeUserNodeSessions.Lock()
+	session := activeUserNodeSessions.items[nodeID]
+	delete(activeUserNodeSessions.items, nodeID)
+	activeUserNodeSessions.Unlock()
+	if session != nil {
+		_ = session.writeJSON(nodeControlMessage{Type: "revoked"})
+		_ = session.conn.Close()
+		markUserNodeOffline(nodeID)
+	}
+}
+
+func userNodeWebSocket(c *gin.Context, clientIP string, token string, userNode *model.UserNode) {
+	conn, err := nodeUpgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+	session := &nodeSession{conn: conn}
+	if !registerUserNodeSession(userNode.ID, session) {
+		_ = session.writeJSON(nodeControlMessage{Type: "revoked"})
+		return
+	}
+	defer unregisterUserNodeSession(userNode.ID, session)
+	conn.SetReadLimit(64 << 10)
+	_ = conn.SetReadDeadline(time.Now().Add(50 * time.Second))
+
+	if err := session.writeJSON(nodeControlMessage{Type: "hello", NodeID: userNode.ID, HeartbeatSeconds: 1}); err != nil {
+		return
+	}
+	updateUserNodeHeartbeat(userNode, clientIP)
+
+	done := make(chan struct{})
+	lastDBHeartbeat := time.Time{}
+	go func() {
+		defer close(done)
+		for {
+			var msg nodeControlMessage
+			if err := conn.ReadJSON(&msg); err != nil {
+				return
+			}
+			if msg.Type == "heartbeat" {
+				if !currentUserNodeSession(userNode.ID, session) {
+					return
+				}
+				_ = conn.SetReadDeadline(time.Now().Add(50 * time.Second))
+				updateUserNodeMonitor(userNode, msg.Metrics)
+				if time.Since(lastDBHeartbeat) >= 10*time.Second {
+					updateUserNodeHeartbeat(userNode, clientIP)
+					lastDBHeartbeat = time.Now()
+				}
+			}
+		}
+	}()
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			var current model.UserNode
+			if err := model.DB.First(&current, userNode.ID).Error; err != nil || current.Token != token {
+				_ = session.writeJSON(nodeControlMessage{Type: "revoked"})
+				return
+			}
+		}
+	}
+}
+
 func NodeWebSocket(c *gin.Context) {
+	clientIP := c.ClientIP()
 	token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
 	if token == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "节点认证失败"})
+		return
+	}
+	var userNode model.UserNode
+	if err := model.DB.Where("token = ?", token).First(&userNode).Error; err == nil {
+		userNodeWebSocket(c, clientIP, token, &userNode)
 		return
 	}
 	var node model.Node
@@ -186,7 +295,7 @@ func NodeWebSocket(c *gin.Context) {
 	if err := session.writeJSON(nodeControlMessage{Type: "rules_snapshot", Rules: rules}); err != nil {
 		return
 	}
-	updateNodeHeartbeat(&node, node.IP)
+	updateNodeHeartbeat(&node, clientIP)
 
 	done := make(chan struct{})
 	lastDBHeartbeat := time.Time{}
@@ -204,7 +313,7 @@ func NodeWebSocket(c *gin.Context) {
 				_ = conn.SetReadDeadline(time.Now().Add(50 * time.Second))
 				updateNodeMonitor(node, msg.Metrics)
 				if time.Since(lastDBHeartbeat) >= 10*time.Second {
-					updateNodeHeartbeat(&node, msg.IP)
+					updateNodeHeartbeat(&node, clientIP)
 					lastDBHeartbeat = time.Now()
 				}
 			}

@@ -23,9 +23,9 @@ func TestMonitorSnapshotUsesFreshMetricsForOnlineState(t *testing.T) {
 		t.Fatal(err)
 	}
 	updateNodeMonitor(node, &nodeMetrics{Hostname: "host", CPUPercent: 42})
-	snapshot := buildMonitorSnapshot([]model.DeviceGroup{group}, []model.Node{node})
+	snapshot := buildMonitorSnapshot([]model.DeviceGroup{group}, []model.Node{node}, nil, true)
 	groups := snapshot["groups"].([]monitorGroupView)
-	if len(groups) != 1 || len(groups[0].Nodes) != 1 || !groups[0].Nodes[0].Online || groups[0].Nodes[0].Metrics.CPUPercent != 42 {
+	if len(groups) != 1 || len(groups[0].Nodes) != 1 || !groups[0].Nodes[0].Online || groups[0].Nodes[0].Metrics.CPUPercent != 42 || groups[0].Nodes[0].Metrics.Hostname != "host" {
 		t.Fatalf("unexpected snapshot: %#v", groups)
 	}
 	nodeMonitorCache.Lock()
@@ -33,7 +33,7 @@ func TestMonitorSnapshotUsesFreshMetricsForOnlineState(t *testing.T) {
 	entry.UpdatedAt = time.Now().Add(-6 * time.Second)
 	nodeMonitorCache.items[node.ID] = entry
 	nodeMonitorCache.Unlock()
-	snapshot = buildMonitorSnapshot([]model.DeviceGroup{group}, []model.Node{node})
+	snapshot = buildMonitorSnapshot([]model.DeviceGroup{group}, []model.Node{node}, nil, true)
 	groups = snapshot["groups"].([]monitorGroupView)
 	if groups[0].Nodes[0].Online {
 		t.Fatal("stale metrics must mark node offline")

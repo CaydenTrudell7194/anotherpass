@@ -101,6 +101,11 @@ func main() {
 			auth.DELETE("/forward_rules/:id", handler.DeleteForwardRule)
 			auth.PUT("/forward_rules/:id/toggle", handler.ToggleForwardRule)
 			auth.POST("/forward_rules/batch", handler.BatchCreateForwardRules)
+
+			auth.POST("/user-nodes", handler.CreateUserNode)
+			auth.GET("/user-nodes", handler.ListUserNodes)
+			auth.GET("/user-nodes/:id/setup", handler.GetUserNodeSetup)
+			auth.DELETE("/user-nodes/:id", handler.DeleteUserNode)
 		}
 
 		admin := api.Group("/admin")
@@ -142,6 +147,9 @@ func main() {
 			admin.GET("/orders", handler.AdminListOrders)
 			admin.POST("/orders/:id/approve", handler.AdminApproveOrder)
 			admin.POST("/orders/:id/reject", handler.AdminRejectOrder)
+
+			admin.GET("/user-nodes", handler.AdminListAllUserNodes)
+			admin.DELETE("/user-nodes/:id", handler.AdminDeleteUserNode)
 		}
 
 		api.POST("/node/heartbeat", handler.NodeHeartbeat)

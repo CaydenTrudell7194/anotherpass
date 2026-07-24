@@ -62,10 +62,23 @@ export default function Settings() {
           <div><Text type="secondary">设备组倍率、允许用户组、连接地址、排序和备注请在“设备组管理”中设置。</Text></div>
         </Card>
         <Card title="Telegram 通知" style={{ marginBottom: 16 }}>
-          <Alert type="info" showIcon style={{marginBottom:16}} message="Bot Token 通过服务器环境变量 TELEGRAM_BOT_TOKEN 配置，不会保存到数据库或发送到浏览器。" />
           <Form.Item name="telegram_enabled" label="启用 Telegram 通知" valuePropName="checked"><Switch /></Form.Item>
+          <Form.Item name="telegram_bot_token" label="Bot Token" extra="留空保持当前值；环境变量 TELEGRAM_BOT_TOKEN 优先级更高">
+            <Input.Password placeholder="留空保持当前值" />
+          </Form.Item>
           <Form.Item name="telegram_chat_id" label="通知 Chat ID" rules={[{max:64}]}><Input placeholder="例如：-1001234567890" /></Form.Item>
           <Form.Item shouldUpdate noStyle>{({getFieldValue}) => <Text type={getFieldValue('telegram_bot_configured')?'success':'warning'}>{getFieldValue('telegram_bot_configured')?'服务器已配置 Bot Token':'服务器尚未配置 Bot Token'}</Text>}</Form.Item>
+        </Card>
+        <Card title="支付网关" style={{ marginBottom: 16 }}>
+          <Alert type="info" showIcon style={{marginBottom:16}} message="商户密钥通过环境变量 EPAY_KEY / CODEPAY_KEY 配置，不保存在数据库中。" />
+          <Row gutter={16}>
+            <Col xs={24} md={12}><Form.Item name="epay_gateway" label="Epay 网关地址"><Input placeholder="https://epay.example.com" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="epay_pid" label="Epay 商户 PID"><Input placeholder="商户PID" /></Form.Item></Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} md={12}><Form.Item name="codepay_create_url" label="CodePay 创建地址"><Input placeholder="https://codepay.example.com/api/..." /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="codepay_merchant_id" label="CodePay 商户ID"><Input placeholder="商户ID" /></Form.Item></Col>
+          </Row>
         </Card>
         <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving} size="large">保存全部设置</Button>
       </Form>

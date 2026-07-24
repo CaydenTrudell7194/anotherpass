@@ -32,7 +32,12 @@ type SiteSettings struct {
 	OfflineNodeRetentionHours int    `json:"offline_node_retention_hours"`
 	TelegramEnabled           bool   `json:"telegram_enabled"`
 	TelegramChatID            string `json:"telegram_chat_id"`
+	TelegramBotToken          string `json:"telegram_bot_token"`
 	TelegramBotConfigured     bool   `json:"telegram_bot_configured" gorm:"-"`
+	EpayGateway               string `json:"epay_gateway"`
+	EpayPid                   string `json:"epay_pid"`
+	CodepayCreateUrl          string `json:"codepay_create_url"`
+	CodepayMerchantId         string `json:"codepay_merchant_id"`
 }
 
 type PublicSiteInfo struct {
@@ -76,7 +81,11 @@ func normalizeSiteSettings(settings *SiteSettings) {
 	settings.BackgroundURL = strings.TrimSpace(settings.BackgroundURL)
 	settings.MobileBackgroundURL = strings.TrimSpace(settings.MobileBackgroundURL)
 	settings.TelegramChatID = strings.TrimSpace(settings.TelegramChatID)
-	settings.TelegramBotConfigured = telegramBotToken() != ""
+	settings.TelegramBotConfigured = telegramBotToken() != "" || settings.TelegramBotToken != ""
+	settings.EpayGateway = strings.TrimSpace(settings.EpayGateway)
+	settings.EpayPid = strings.TrimSpace(settings.EpayPid)
+	settings.CodepayCreateUrl = strings.TrimSpace(settings.CodepayCreateUrl)
+	settings.CodepayMerchantId = strings.TrimSpace(settings.CodepayMerchantId)
 	if settings.SiteName == "" {
 		settings.SiteName = "转发面板"
 	}
@@ -123,7 +132,7 @@ func validateSiteSettings(settings *SiteSettings) string {
 	if len(settings.BackgroundURL) > 1024 || len(settings.MobileBackgroundURL) > 1024 {
 		return "背景图URL过长"
 	}
-	if settings.TelegramEnabled && (settings.TelegramChatID == "" || len(settings.TelegramChatID) > 64 || telegramBotToken() == "") {
+	if settings.TelegramEnabled && (settings.TelegramChatID == "" || len(settings.TelegramChatID) > 64 || (telegramBotToken() == "" && settings.TelegramBotToken == "")) {
 		return "Telegram Bot Token 未配置或 Chat ID 无效"
 	}
 	var group model.UserGroup
@@ -141,15 +150,49 @@ func PublicSiteSettings(c *gin.Context) {
 }
 
 func GetSiteSettings(c *gin.Context) {
-	c.JSON(http.StatusOK, LoadSiteSettings())
+	settings := LoadSiteSettings()
+	if settings.TelegramBotToken != "" {
+		settings.TelegramBotToken = "****"
+	}
+	c.JSON(http.StatusOK, settings)
 }
 
 func UpdateSiteSettings(c *gin.Context) {
-	settings := LoadSiteSettings()
-	if err := c.ShouldBindJSON(&settings); err != nil {
+	oldSettings := LoadSiteSettings()
+	oldToken := oldSettings.TelegramBotToken
+
+	var incoming SiteSettings
+	if err := c.ShouldBindJSON(&incoming); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
 	}
+
+	settings := oldSettings
+	settings.SiteName = incoming.SiteName
+	settings.SiteSubtitle = incoming.SiteSubtitle
+	settings.SiteNotice = incoming.SiteNotice
+	settings.AllowRegister = incoming.AllowRegister
+	settings.RegisterUserGroupID = incoming.RegisterUserGroupID
+	settings.RegisterRuleLimit = incoming.RegisterRuleLimit
+	settings.RegisterExpireDays = incoming.RegisterExpireDays
+	settings.ThemePolicy = incoming.ThemePolicy
+	settings.BackgroundURL = incoming.BackgroundURL
+	settings.MobileBackgroundURL = incoming.MobileBackgroundURL
+	settings.OfflineNodeSeconds = incoming.OfflineNodeSeconds
+	settings.OfflineNodeRetentionHours = incoming.OfflineNodeRetentionHours
+	settings.TelegramEnabled = incoming.TelegramEnabled
+	settings.TelegramChatID = incoming.TelegramChatID
+	settings.EpayGateway = incoming.EpayGateway
+	settings.EpayPid = incoming.EpayPid
+	settings.CodepayCreateUrl = incoming.CodepayCreateUrl
+	settings.CodepayMerchantId = incoming.CodepayMerchantId
+
+	if incoming.TelegramBotToken == "" || incoming.TelegramBotToken == "****" {
+		settings.TelegramBotToken = oldToken
+	} else {
+		settings.TelegramBotToken = incoming.TelegramBotToken
+	}
+
 	if msg := validateSiteSettings(&settings); msg != "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": msg})
 		return
@@ -165,7 +208,10 @@ func UpdateSiteSettings(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存失败"})
 		return
 	}
-	settings.TelegramBotConfigured = telegramBotToken() != ""
+	if settings.TelegramBotToken != "" {
+		settings.TelegramBotToken = "****"
+	}
+	settings.TelegramBotConfigured = telegramBotToken() != "" || oldToken != ""
 	c.JSON(http.StatusOK, settings)
 }
 

@@ -328,3 +328,23 @@ func recountOnlineNodes(groupID uint) {
 	model.DB.Model(&model.Node{}).Where("device_group_id = ? AND status = ?", groupID, "online").Count(&count)
 	model.DB.Model(&model.DeviceGroup{}).Where("id = ?", groupID).Update("online_devices", count)
 }
+
+func updateUserNodeHeartbeat(node *model.UserNode, ip string) {
+	now := time.Now()
+	values := map[string]interface{}{"last_heartbeat": now, "status": "online", "ip": strings.TrimSpace(ip)}
+	model.DB.Model(&model.UserNode{}).Where("id = ?", node.ID).Updates(values)
+	node.LastHeartbeat = now
+	node.Status = "online"
+	node.IP = strings.TrimSpace(ip)
+	notifyTelegram("用户节点上线：" + node.Name)
+}
+
+func markUserNodeOffline(nodeID uint) {
+	result := model.DB.Model(&model.UserNode{}).Where("id = ? AND status = ?", nodeID, "online").Update("status", "offline")
+	if result.Error == nil && result.RowsAffected == 1 {
+		var node model.UserNode
+		if model.DB.Select("name").First(&node, nodeID).Error == nil {
+			notifyTelegram("用户节点离线：" + node.Name)
+		}
+	}
+}

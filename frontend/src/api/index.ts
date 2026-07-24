@@ -67,6 +67,11 @@ export const getNodeSetup = (id: number) => api.post(`/admin/nodes/${id}/setup`)
 export const rotateNodeToken = (id: number) => api.post(`/admin/nodes/${id}/rotate-token`)
 export const deleteNode = (id: number) => api.delete(`/admin/nodes/${id}`)
 
+export const listMyServers = () => api.get('/user-nodes')
+export const createMyServer = (data: any) => api.post('/user-nodes', data)
+export const deleteMyServer = (id: number) => api.delete(`/user-nodes/${id}`)
+export const getMyServerSetup = (id: number) => api.get(`/user-nodes/${id}/setup`)
+
 export const listPlans = () => api.get('/plans')
 export const listOrders = () => api.get('/orders')
 export const createOrder = (data: any) => api.post('/orders', data)

@@ -24,6 +24,7 @@ type forwardRuleInput struct {
 	ListenPort    int     `json:"listen_port"`
 	TargetAddr    string  `json:"target_addr"`
 	TargetPort    int     `json:"target_port"`
+	Dest          string  `json:"dest"`
 	Protocol      string  `json:"protocol"`
 	Rate          float64 `json:"rate"`
 	Enabled       *bool   `json:"enabled"`
@@ -35,6 +36,7 @@ type forwardRuleUpdateInput struct {
 	ListenPort    *int     `json:"listen_port"`
 	TargetAddr    *string  `json:"target_addr"`
 	TargetPort    *int     `json:"target_port"`
+	Dest          *string  `json:"dest"`
 	Protocol      *string  `json:"protocol"`
 	Rate          *float64 `json:"rate"`
 	Enabled       *bool    `json:"enabled"`
@@ -49,12 +51,38 @@ func parseID(c *gin.Context) (uint, bool) {
 	return uint(id), true
 }
 
+func parseDest(dest string) (addr string, port int) {
+	lines := strings.Split(strings.TrimSpace(dest), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, ":")
+		if len(parts) == 2 {
+			a := strings.TrimSpace(parts[0])
+			p, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+			if err == nil && p >= 1 && p <= 65535 && a != "" && len(a) <= 256 {
+				return a, p
+			}
+		}
+	}
+	return "", 0
+}
+
 func validateForwardRule(input *forwardRuleInput) string {
 	input.Name = strings.TrimSpace(input.Name)
 	input.TargetAddr = strings.TrimSpace(input.TargetAddr)
 	input.Protocol = strings.ToLower(strings.TrimSpace(input.Protocol))
 	if input.Protocol == "" {
 		input.Protocol = "tcp"
+	}
+	if input.Dest != "" {
+		addr, port := parseDest(input.Dest)
+		if addr != "" && port > 0 {
+			input.TargetAddr = addr
+			input.TargetPort = port
+		}
 	}
 	if input.Name == "" || len(input.Name) > 128 {
 		return "规则名称不能为空且不能超过128个字符"
@@ -243,6 +271,14 @@ func UpdateForwardRule(c *gin.Context) {
 	}
 	if patch.TargetPort != nil {
 		input.TargetPort = *patch.TargetPort
+	}
+	if patch.Dest != nil && *patch.Dest != "" {
+		input.Dest = *patch.Dest
+		addr, port := parseDest(input.Dest)
+		if addr != "" && port > 0 {
+			input.TargetAddr = addr
+			input.TargetPort = port
+		}
 	}
 	if patch.Protocol != nil {
 		input.Protocol = *patch.Protocol

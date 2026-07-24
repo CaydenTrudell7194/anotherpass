@@ -5,6 +5,7 @@ import Home from './pages/user/Home'
 import Profile from './pages/user/Profile'
 import ForwardRules from './pages/user/ForwardRules'
 import DeviceGroups from './pages/user/DeviceGroups'
+import MyServers from './pages/user/MyServers'
 import NodeStatus from './pages/user/NodeStatus'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminUsers from './pages/admin/Users'
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="profile" element={<Profile />} />
         <Route path="forward_rules" element={<ForwardRules />} />
         <Route path="device_group" element={<DeviceGroups />} />
+        <Route path="my_servers" element={<MyServers />} />
         <Route path="node_status" element={<NodeStatus />} />
         <Route path="plans" element={<Plans />} />
         <Route path="admin/dashboard" element={<AdminDashboard />} />

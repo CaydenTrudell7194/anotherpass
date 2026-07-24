@@ -39,6 +39,8 @@ type Metrics = {
   udp_conn_count: number
   uptime_seconds: number
   boot_time: number
+  ip4_geo?: string
+  ip6_geo?: string
 }
 
 type Node = {
@@ -76,6 +78,10 @@ const formatTime = (value?: string) => {
 }
 
 const formatUnixTime = (value?: number) => value && value > 0 ? new Date(value * 1000).toLocaleString('zh-CN', { hour12: false }) : '-'
+
+const countryFlag = (code?: string) => code && code.length === 2
+  ? String.fromCodePoint(code.charCodeAt(0) - 0x41 + 0x1F1E6, code.charCodeAt(1) - 0x41 + 0x1F1E6)
+  : ''
 
 const formatUptime = (seconds: number) => {
   const total = Math.max(0, Math.floor(number(seconds)))
@@ -204,6 +210,8 @@ export default function NodeStatus() {
             <strong>{node.name || `节点 #${node.id}`}</strong>
           </div>
           <span className="node-status__mono">{node.ip || '-'}</span>
+          {node.metrics?.ip4_geo && <span className="node-status__mono">{countryFlag(node.metrics.ip4_geo)} {node.metrics.ip4_geo}</span>}
+          {node.metrics?.ip6_geo && <span className="node-status__mono">{countryFlag(node.metrics.ip6_geo)} {node.metrics.ip6_geo}</span>}
         </div>
       ),
     },

@@ -90,14 +90,30 @@ export default function ForwardRules() {
     }
   }
 
+  const parseDestinations = (dest: string) => {
+    const lines = dest.split('\n').map(l => l.trim()).filter(Boolean)
+    if (lines.length === 0) return { target_addr: '', target_port: 0 }
+    const parts = lines[0].split(':')
+    if (parts.length === 2) {
+      const port = parseInt(parts[1], 10)
+      if (!isNaN(port) && port >= 1 && port <= 65535) {
+        return { target_addr: parts[0], target_port: port }
+      }
+    }
+    return { target_addr: '', target_port: 0 }
+  }
+
   const handleAdd = async (values: any) => {
     setSubmitting(true)
     try {
+      const { target_addr, target_port } = parseDestinations(values.destinations || values.target_addr + ':' + values.target_port)
+      const payload = { ...values, target_addr, target_port }
+      delete payload.destinations
       if (editingRule) {
-        await updateForwardRule(editingRule.id, values)
+        await updateForwardRule(editingRule.id, payload)
         message.success('修改成功')
       } else {
-        await createForwardRule(values)
+        await createForwardRule(payload)
         message.success('添加成功')
       }
       setAddModalOpen(false)
@@ -119,14 +135,25 @@ export default function ForwardRules() {
       if (text.startsWith('[')) {
         // NY 新格式 (JSON)
         const json = JSON.parse(text)
-        parsed = (Array.isArray(json) ? json : [json]).map((r: any) => ({
-          name: r.name || r.规则名 || '',
-          device_group_id: values.device_group_id,
-          listen_port: r.listen_port || r.监听端口 || 0,
-          target_addr: r.target_addr || r.目标地址 || '',
-          target_port: r.target_port || r.目标端口 || 0,
-          protocol: String(r.protocol || r.协议 || 'tcp').toLowerCase(),
-        }))
+        parsed = (Array.isArray(json) ? json : [json]).map((r: any) => {
+          let target_addr = r.target_addr || r.目标地址 || ''
+          let target_port = r.target_port || r.目标端口 || 0
+          if (r.dest && Array.isArray(r.dest) && r.dest.length > 0) {
+            const parts = r.dest[0].split(':')
+            if (parts.length === 2) {
+              target_addr = parts[0]
+              target_port = parseInt(parts[1], 10) || 0
+            }
+          }
+          return {
+            name: r.name || r.规则名 || '',
+            device_group_id: values.device_group_id,
+            listen_port: r.listen_port || r.监听端口 || 0,
+            target_addr,
+            target_port,
+            protocol: String(r.protocol || r.协议 || 'tcp').toLowerCase(),
+          }
+        })
       } else {
         // NY 旧格式: 名称#监听端口#目标地址#目标端口
         const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
@@ -169,12 +196,11 @@ export default function ForwardRules() {
   }
 
   const handleBatchExport = () => {
-    // NY 新格式 (JSON)
+    // NY 新格式 (JSON) with dest
     const exportData = rules.map(r => ({
       name: r.name,
       listen_port: r.listen_port,
-      target_addr: r.target_addr,
-      target_port: r.target_port,
+      dest: [`${r.target_addr}:${r.target_port}`],
       protocol: r.protocol || 'tcp',
     }))
     const json = JSON.stringify(exportData, null, 2)
@@ -192,7 +218,7 @@ export default function ForwardRules() {
 
   const openEdit = (rule: any) => {
     setEditingRule(rule)
-    form.setFieldsValue(rule)
+    form.setFieldsValue({ ...rule, destinations: `${rule.target_addr}:${rule.target_port}` })
     setAddModalOpen(true)
   }
 
@@ -243,6 +269,7 @@ export default function ForwardRules() {
       key: String(id),
       label: `${groupMap.get(id)?.name || `#${id}`} (${rules.filter(r => r.device_group_id === id).length})`,
     })),
+    { key: 'users', label: '用户节点选择（开发中）' },
   ]
 
   return (
@@ -280,19 +307,23 @@ export default function ForwardRules() {
         }
       >
         <Tabs activeKey={activeGroup} onChange={setActiveGroup} items={groupTabs} style={{ marginBottom: 8 }} />
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={filteredRules}
-          loading={loading}
-          rowSelection={{
-            selectedRowKeys,
-            onChange: (keys) => setSelectedRowKeys(keys),
-          }}
-          pagination={{ pageSize: 20, showSizeChanger: true, showTotal: t => `共 ${t} 条` }}
-          scroll={{ x: 800 }}
-          size="small"
-        />
+        {activeGroup === 'users' ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#999' }}>用户节点选择功能正在开发中</div>
+        ) : (
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={filteredRules}
+            loading={loading}
+            rowSelection={{
+              selectedRowKeys,
+              onChange: (keys) => setSelectedRowKeys(keys),
+            }}
+            pagination={{ pageSize: 20, showSizeChanger: true, showTotal: t => `共 ${t} 条` }}
+            scroll={{ x: 800 }}
+            size="small"
+          />
+        )}
       </Card>
 
       <Modal
@@ -316,12 +347,13 @@ export default function ForwardRules() {
           <Form.Item name="listen_port" label="监听端口" rules={[{ required: true, message: '请输入监听端口' }]}>
             <InputNumber min={1} max={65535} style={{ width: '100%' }} placeholder="例如: 8080" />
           </Form.Item>
-          <Form.Item name="target_addr" label="目标地址" rules={[{ required: true, message: '请输入目标地址' }]}>
-            <Input placeholder="例如: 192.168.1.100" />
+          <Form.Item name="destinations" label="目标地址（每行一个 IP:端口）" rules={[{ required: true, message: '请输入目标地址' }]}
+            extra="首行作为主目标，支持多行备用"
+          >
+            <Input.TextArea rows={3} placeholder={"例如:\n192.168.1.100:80\n10.0.0.1:443"} />
           </Form.Item>
-          <Form.Item name="target_port" label="目标端口" rules={[{ required: true, message: '请输入目标端口' }]}>
-            <InputNumber min={1} max={65535} style={{ width: '100%' }} placeholder="例如: 80" />
-          </Form.Item>
+          <Form.Item name="target_addr" hidden><Input /></Form.Item>
+          <Form.Item name="target_port" hidden><InputNumber /></Form.Item>
           <Form.Item name="protocol" label="协议">
             <Select>
               <Select.Option value="tcp">TCP</Select.Option>
@@ -353,7 +385,7 @@ export default function ForwardRules() {
           <Form.Item name="rules_text" label="规则数据" rules={[{ required: true, message: '请输入规则数据' }]}
             extra="支持 NY 新旧两种格式：JSON 数组 或 每行 名称#监听端口#目标地址#目标端口"
           >
-            <Input.TextArea rows={8} placeholder={'JSON 格式:\n[{"name":"规则1","listen_port":8080,"target_addr":"192.168.1.1","target_port":80}]\n\n行格式:\n规则1#8080#192.168.1.1#80'} />
+            <Input.TextArea rows={8} placeholder={'JSON 格式:\n[{"name":"规则1","listen_port":8080,"dest":["192.168.1.1:80"]}]\n\n行格式:\n规则1#8080#192.168.1.1#80'} />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={submitting} block>导入</Button>

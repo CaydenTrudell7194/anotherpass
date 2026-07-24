@@ -41,10 +41,10 @@ export default function Login() {
           <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
             <Input prefix={<UserOutlined />} placeholder="用户名" />
           </Form.Item>
-          {settings.allow_register && <div style={{ textAlign: 'center' }}><Link to="/register">注册新账户</Link></div>}
           <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
             <Input.Password prefix={<LockOutlined />} placeholder="密码" />
           </Form.Item>
+          {settings.allow_register && <div style={{ textAlign: 'right', marginBottom: 24 }}><Link to="/register">注册新账户</Link></div>}
           <Form.Item>
             <Button type="primary" htmlType="submit" block loading={loading} icon={<SendOutlined />}>
               登 录
