@@ -192,9 +192,9 @@ export default function ForwardRules() {
     }
     const invalidIndex = parsed.findIndex(r => !String(r.name || '').trim() || !String(r.target_addr || '').trim() ||
       !Number.isInteger(r.listen_port) || r.listen_port < 1 || r.listen_port > 65535 ||
-      !Number.isInteger(r.target_port) || r.target_port < 1 || r.target_port > 65535 || r.protocol !== 'tcp')
+      !Number.isInteger(r.target_port) || r.target_port < 1 || r.target_port > 65535 || !['tcp','udp','tcp+udp'].includes(r.protocol || ''))
     if (invalidIndex >= 0) {
-      message.error(`第 ${invalidIndex + 1} 条规则无效；当前仅支持 TCP，端口范围为 1-65535`)
+      message.error(`第 ${invalidIndex + 1} 条规则无效；端口范围为 1-65535，协议仅支持 tcp/udp/tcp+udp`)
       return
     }
 
@@ -242,11 +242,16 @@ export default function ForwardRules() {
   const columns = [
     { title: '规则名', dataIndex: 'name', key: 'name', ellipsis: true },
     {
-      title: '入口设备组', dataIndex: 'device_group_id', key: 'device_group_id',
-      render: (id: number) => groupMap.get(id)?.name || `#${id}`,
+      title: '连接地址',
+      key: 'connection',
+      width: 220,
+      render: (_, r) => {
+        const group = groupMap.get(r.device_group_id)
+        const addr = group?.connection_addr || group?.name || `#${r.device_group_id}`
+        return `${addr}:${r.listen_port}`
+      },
     },
-    { title: '目标地址', dataIndex: 'target_addr', key: 'target_addr' },
-    { title: '监听端口', dataIndex: 'listen_port', key: 'listen_port', width: 100 },
+    { title: '目标地址', key: 'dest', width: 200, render: (_, r) => `${r.target_addr}:${r.target_port}` },
     {
       title: '流量', key: 'traffic', width: 120,
       render: (_: any, r: any) => (
