@@ -85,9 +85,11 @@ const formatTime = (value?: string) => {
 
 const formatUnixTime = (value?: number) => value && value > 0 ? new Date(value * 1000).toLocaleString('zh-CN', { hour12: false }) : '-'
 
-const countryFlag = (code?: string) => code && code.length === 2
-  ? String.fromCodePoint(code.charCodeAt(0) - 0x41 + 0x1F1E6, code.charCodeAt(1) - 0x41 + 0x1F1E6)
-  : ''
+const countryFlag = (code?: string) => {
+  if (!code || code.length !== 2) return null
+  const lc = code.toLowerCase()
+  return <span className={`fi fi-${lc}`} style={{ marginRight: 6, borderRadius: 2 }} />
+}
 
 const formatUptime = (seconds: number) => {
   const total = Math.max(0, Math.floor(number(seconds)))
@@ -316,45 +318,46 @@ export default function NodeStatus() {
                 const cpuVal = number(node.metrics?.cpu_percent)
                 const memVal = percent(node.metrics?.mem_used, node.metrics?.mem_total)
                 const diskVal = percent(node.metrics?.disk_used, node.metrics?.disk_total)
-                const flag4 = countryFlag(node.ip4_geo || node.metrics?.ip4_geo || '')
-                const flag6 = countryFlag(node.ip6_geo || node.metrics?.ip6_geo || '')
+                const flag4 = countryFlag(node.ip4_geo || node.metrics?.ip4_geo)
+                const flag6 = countryFlag(node.ip6_geo || node.metrics?.ip6_geo)
 
                 const v4Address = node.ip4 || node.ip || ''
                 const v6Address = node.ip6 || ''
 
                 return (
                   <div className={`glass-card node-strip ${node.online ? 'is-online' : 'is-offline'}`} key={node.id}>
-                    {/* 第一块：状态 glow + 节点名 */}
+                    {/* 第一块：状态 glow + 统一的 IP 与国旗旗帜 (替代节点名标题) */}
                     <div className="node-strip__section node-strip__identity">
                       <span className={`status-glow ${node.online ? 'is-online' : ''}`} />
-                      <div className="node-strip__name-area">
-                        <span className="node-strip__name" title={node.name}>
-                          {node.name || `节点 #${node.id}`}
-                        </span>
-                        {node.metrics?.hostname && (
-                          <Tooltip title={
-                            <div>
-                              <strong>{node.metrics.hostname}</strong><br />
-                              OS: {node.metrics.platform} {node.metrics.platform_version} ({node.metrics.arch})<br />
-                              Agent: {node.metrics.version || 'v1.0.0'}
-                            </div>
-                          }>
-                            <span className="node-strip__host"><InfoCircleOutlined /> {node.metrics.hostname}</span>
-                          </Tooltip>
-                        )}
+                      <div className="node-strip__ips">
+                        <div className="ip-entry">
+                          {flag4}
+                          <span className="ip-entry__addr">{v4Address || <span className="text-muted">IPv4 未分配/被隐藏</span>}</span>
+                        </div>
+                        <div className="ip-entry">
+                          {flag6}
+                          <span className="ip-entry__addr">{v6Address || <span className="text-muted">IPv6 未分配/被隐藏</span>}</span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* 第二块：等大无标题 IPv4 与 IPv6 地址区，各配独立国旗 emoji */}
-                    <div className="node-strip__section node-strip__ips">
-                      <div className="ip-entry">
-                        <span className="ip-entry__flag">{flag4 || '🌐'}</span>
-                        <span className="ip-entry__addr">{v4Address || <span className="text-muted">IPv4 未分配/被隐藏</span>}</span>
-                      </div>
-                      <div className="ip-entry">
-                        <span className="ip-entry__flag">{flag6 || '🌐'}</span>
-                        <span className="ip-entry__addr">{v6Address || <span className="text-muted">IPv6 未分配/被隐藏</span>}</span>
-                      </div>
+                    {/* 第二块：节点 Host & 系统信息 */}
+                    <div className="node-strip__section node-strip__name-area">
+                      {node.metrics?.hostname ? (
+                        <Tooltip title={
+                          <div>
+                            <strong>{node.metrics.hostname}</strong><br />
+                            OS: {node.metrics.platform} {node.metrics.platform_version} ({node.metrics.arch})<br />
+                            Agent: {node.metrics.version || 'v1.0.0'}
+                          </div>
+                        }>
+                          <span className="node-strip__host"><InfoCircleOutlined /> {node.metrics.hostname}</span>
+                        </Tooltip>
+                      ) : (
+                        <span className="node-strip__name" title={node.name}>
+                          {node.name || `节点 #${node.id}`}
+                        </span>
+                      )}
                     </div>
 
                     {/* 第三块：实时速率与运行时间 */}
