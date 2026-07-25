@@ -77,10 +77,10 @@ if [ -n "$DOMAIN" ] && ! is_ip "$DOMAIN" && ! is_domain "$DOMAIN"; then
   echo -e "${RED}域名格式无效${NC}"
   exit 1
 fi
-USE_HTTPS="y"
+USE_HTTPS="n"
 if [ -n "$DOMAIN" ] && ! is_ip "$DOMAIN"; then
-  read -p "启用 HTTPS (Let's Encrypt)? (Y/n) 选n则仅HTTP，可用于套CDN回源: " USE_HTTPS
-  USE_HTTPS="${USE_HTTPS:-y}"
+  read -p "启用 HTTPS (Let's Encrypt)? (y/N) 选n则仅HTTP，可用于套CDN回源: " USE_HTTPS
+  USE_HTTPS="${USE_HTTPS:-n}"
 fi
 umask 077
 LEGACY_UPGRADE="n"
