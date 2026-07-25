@@ -480,30 +480,35 @@ func (p *ProxyServer) handleConnection(src net.Conn) {
 	wg.Wait()
 }
 
-func fetchPublicIP(url string) string {
+func fetchPublicIP(urls []string) string {
 	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get(url)
-	if err != nil {
-		return ""
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 128))
-	if err != nil {
-		return ""
-	}
-	ip := strings.TrimSpace(string(body))
-	if net.ParseIP(ip) != nil {
-		return ip
+	for _, urlStr := range urls {
+		resp, err := client.Get(urlStr)
+		if err != nil {
+			continue
+		}
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 128))
+		resp.Body.Close()
+		if err != nil {
+			continue
+		}
+		ip := strings.TrimSpace(string(body))
+		if net.ParseIP(ip) != nil {
+			return ip
+		}
 	}
 	return ""
 }
 
 func getOutboundIPs() (ip4, ip6 string) {
-	// Try public IPv4
-	ip4 = fetchPublicIP("https://api4.ipify.org")
-	if ip4 == "" {
-		ip4 = fetchPublicIP("http://v4.ipv6-test.com/api/myip.php")
-	}
+	ip4 = fetchPublicIP([]string{
+		"https://api4.ipify.org",
+		"http://api4.ipify.org",
+		"https://checkip.amazonaws.com",
+		"http://checkip.amazonaws.com",
+		"https://v4.ident.me",
+		"http://v4.ident.me",
+	})
 	if ip4 == "" {
 		if conn, err := net.Dial("udp4", "8.8.8.8:80"); err == nil {
 			if host, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
@@ -513,11 +518,12 @@ func getOutboundIPs() (ip4, ip6 string) {
 		}
 	}
 
-	// Try public IPv6
-	ip6 = fetchPublicIP("https://api6.ipify.org")
-	if ip6 == "" {
-		ip6 = fetchPublicIP("http://v6.ipv6-test.com/api/myip.php")
-	}
+	ip6 = fetchPublicIP([]string{
+		"https://api6.ipify.org",
+		"http://api6.ipify.org",
+		"https://v6.ident.me",
+		"http://v6.ident.me",
+	})
 	if ip6 == "" {
 		if conn, err := net.Dial("udp6", "[2001:4860:4860::8888]:80"); err == nil {
 			if host, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {

@@ -127,6 +127,7 @@ type monitorNodeView struct {
 	DeviceGroupID uint        `json:"device_group_id"`
 	Name          string      `json:"name"`
 	IP            string      `json:"ip"`
+	IP6           string      `json:"ip6"`
 	IP4Geo        string      `json:"ip4_geo"`
 	IP6Geo        string      `json:"ip6_geo"`
 	Online        bool        `json:"online"`
@@ -169,12 +170,13 @@ func buildMonitorSnapshot(groups []model.DeviceGroup, nodes []model.Node, userNo
 		online := node.Status == "online" && (!lastUpdate.IsZero() && now.Sub(lastUpdate) < 5*time.Second || lastUpdate.IsZero() && now.Sub(node.LastHeartbeat) < 20*time.Second)
 		ip4Geo, ip6Geo := lookupNodeGeo(node.IP4, node.IP6, seenIPs)
 		view := monitorNodeView{
-			ID: node.ID, DeviceGroupID: node.DeviceGroupID, Name: node.Name, IP: node.IP,
+			ID: node.ID, DeviceGroupID: node.DeviceGroupID, Name: node.Name, IP: node.IP, IP6: node.IP6,
 			IP4Geo: ip4Geo, IP6Geo: ip6Geo, Online: online,
 			LastHeartbeat: node.LastHeartbeat, LastUpdate: lastUpdate, Metrics: entry.Metrics,
 		}
 		if !isAdmin {
 			view.IP = ""
+			view.IP6 = ""
 			view.Metrics.Hostname = ""
 			view.Metrics.Platform = ""
 			view.Metrics.PlatformVersion = ""

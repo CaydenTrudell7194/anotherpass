@@ -722,9 +722,10 @@ export default function NodeStatus() {
         }
 
         .ip-entry__flag {
-          font-size: 16px;
+          font-size: 20px;
           line-height: 1;
           flex-shrink: 0;
+          font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Twemoji Mozilla', 'EmojiOne Color', sans-serif;
         }
 
         .ip-entry__addr {
