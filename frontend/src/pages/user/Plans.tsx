@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Alert, Button, Card, Col, Empty, Form, Input, InputNumber, Modal, Radio, Row, Space, Table, Tag, Typography, message, Statistic } from 'antd'
-import { CheckCircleOutlined, ShoppingCartOutlined, WalletOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, ShoppingCartOutlined, WalletOutlined, SendOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { createOrder, errorMessage, listOrders, listPlans, getProfile, purchasePlanWithBalance, listRechargeProviders, createRecharge } from '../../api'
+import { createOrder, errorMessage, listOrders, listPlans, getProfile, purchasePlanWithBalance, listRechargeProviders, createRecharge, redeemCode } from '../../api'
 
 interface Plan {
   id: number
@@ -50,6 +50,22 @@ export default function Plans() {
   const [providers, setProviders] = useState<Record<string,boolean>>({})
   const [rechargeForm] = Form.useForm()
   const [rechargeKey, setRechargeKey] = useState('')
+  const [redeemCodeVal, setRedeemCodeVal] = useState('')
+
+  const submitRedeem = async () => {
+    if (!redeemCodeVal.trim()) return
+    setSubmitting(true)
+    try {
+      const res = await redeemCode(redeemCodeVal.trim())
+      message.success('兑换成功！余额已增加')
+      setRedeemCodeVal('')
+      fetchData()
+    } catch (err) {
+      message.error(errorMessage(err, '兑换失败'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   const fetchData = async () => {
     setLoading(true)
@@ -169,5 +185,11 @@ export default function Plans() {
         <Form.Item name="provider" label="支付渠道" rules={[{required:true}]}><Radio.Group>{providers.epay&&<Radio value="epay">易支付</Radio>}{providers.codepay&&<Radio value="codepay">码支付</Radio>}</Radio.Group></Form.Item>
       </Form>
     </Modal>
+    <Card size="small" title="兑换码" style={{marginTop:16}}>
+      <Space.Compact style={{width:'100%'}}>
+        <Input placeholder="请输入兑换码" value={redeemCodeVal} onChange={e => setRedeemCodeVal(e.target.value)} onPressEnter={submitRedeem} />
+        <Button type="primary" icon={<SendOutlined />} onClick={submitRedeem} loading={submitting}>兑换</Button>
+      </Space.Compact>
+    </Card>
   </div>
 }

@@ -37,6 +37,47 @@ func AdminListAffiliates(c *gin.Context) {
 	c.JSON(http.StatusOK, affs)
 }
 
+func AdminUpdateAffiliate(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID无效"})
+		return
+	}
+	var input struct {
+		CommissionRate   *float64 `json:"commission_rate"`
+		TotalEarnedCents *int64   `json:"total_earned_cents"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+	updates := map[string]interface{}{}
+	if input.CommissionRate != nil {
+		if *input.CommissionRate < 0 || *input.CommissionRate > 1 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "佣金比例必须在 0-1 之间"})
+			return
+		}
+		updates["commission_rate"] = *input.CommissionRate
+	}
+	if input.TotalEarnedCents != nil {
+		if *input.TotalEarnedCents < 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "累计收益不能为负数"})
+			return
+		}
+		updates["total_earned_cents"] = *input.TotalEarnedCents
+	}
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "没有需要更新的字段"})
+		return
+	}
+	result := model.DB.Model(&model.Affiliate{}).Where("id = ?", id).Updates(updates)
+	if result.Error != nil || result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "推广记录不存在"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
+}
+
 func RedeemCodeHandler(c *gin.Context) {
 	var input struct {
 		Code string `json:"code" binding:"required"`
@@ -56,8 +97,17 @@ func RedeemCodeHandler(c *gin.Context) {
 		if code.ExpiresAt != nil && code.ExpiresAt.Before(time.Now()) {
 			return errors.New("兑换码已过期")
 		}
-		if code.MaxUses > 0 && code.UsedCount >= code.MaxUses {
-			return errors.New("兑换码已达使用上限")
+		if code.MaxUses > 0 {
+			if code.UsedCount >= code.MaxUses {
+				return errors.New("兑换码已达使用上限")
+			}
+			result := tx.Model(&model.RedeemCode{}).Where("id = ? AND used_count = ?", code.ID, code.UsedCount).Update("used_count", code.UsedCount+1)
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected != 1 {
+				return errors.New("兑换码并发冲突")
+			}
 		}
 		var existing int64
 		if err := tx.Model(&model.BalanceLedger{}).Where("operation_key = ?", "redeem:"+input.Code+":"+strconv.FormatUint(uint64(userID), 10)).Count(&existing).Error; err != nil {
@@ -65,9 +115,6 @@ func RedeemCodeHandler(c *gin.Context) {
 		}
 		if existing > 0 {
 			return errors.New("该兑换码已使用")
-		}
-		if err := tx.Model(&code).Update("used_count", code.UsedCount+1).Error; err != nil {
-			return err
 		}
 		result := tx.Model(&model.User{}).Where("id = ? AND balance_cents <= ?", userID, int64(^uint64(0)>>1)-code.AmountCents).UpdateColumn("balance_cents", gorm.Expr("balance_cents + ?", code.AmountCents))
 		if result.Error != nil || result.RowsAffected != 1 {

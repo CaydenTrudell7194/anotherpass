@@ -6,6 +6,7 @@ export interface SiteSettings {
   site_subtitle: string
   site_notice: string
   allow_register: boolean
+  allow_user_nodes?: boolean
   register_user_group_id: number
   register_rule_limit: number
   register_expire_days: number
@@ -18,6 +19,7 @@ export interface SiteSettings {
 
 export const defaultSiteSettings: SiteSettings = {
   site_name: '转发面板', site_subtitle: '入口直出转发管理平台', site_notice: '', allow_register: false,
+  allow_user_nodes: true,
   register_user_group_id: 1, register_rule_limit: 100, register_expire_days: 365,
   theme_policy: 'classic', background_url: '', mobile_background_url: '', offline_node_seconds: 90,
   offline_node_retention_hours: 24,

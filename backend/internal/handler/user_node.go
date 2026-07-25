@@ -13,6 +13,10 @@ import (
 )
 
 func CreateUserNode(c *gin.Context) {
+	if !LoadSiteSettings().AllowUserNodes {
+		c.JSON(http.StatusForbidden, gin.H{"error": "单端隧道功能已关闭"})
+		return
+	}
 	var req struct {
 		Name string `json:"name"`
 	}

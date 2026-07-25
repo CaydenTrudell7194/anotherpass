@@ -48,6 +48,7 @@ func main() {
 		}
 	}()
 
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	if err := r.SetTrustedProxies(nil); err != nil {
 		log.Fatalf("代理配置失败: %v", err)
@@ -57,6 +58,7 @@ func main() {
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("Referrer-Policy", "same-origin")
+		c.Header("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' ws: wss:")
 		c.Next()
 	})
 
@@ -155,6 +157,7 @@ func main() {
 			admin.DELETE("/user-nodes/:id", handler.AdminDeleteUserNode)
 
 			admin.GET("/affiliates", handler.AdminListAffiliates)
+			admin.PUT("/affiliates/:id", handler.AdminUpdateAffiliate)
 			admin.POST("/redeem-codes", handler.AdminCreateRedeemCodes)
 			admin.GET("/redeem-codes", handler.AdminListRedeemCodes)
 			admin.DELETE("/redeem-codes/:id", handler.AdminDeleteRedeemCode)

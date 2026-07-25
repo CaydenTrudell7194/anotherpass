@@ -18,12 +18,33 @@ const ModernStyle = () => (
 
     /* 强制 Antd 组件玻璃化 */
     .ant-layout, .ant-layout-header, .ant-layout-sider, .ant-card, .ant-table, 
-    .ant-modal-content, .ant-menu, .ant-input, .ant-select-selector, .ant-tag {
+    .ant-modal-content, .ant-menu, .ant-tag, .ant-select-dropdown {
       background: rgba(255, 255, 255, 0.05) !important;
       backdrop-filter: blur(15px) !important;
       -webkit-backdrop-filter: blur(15px) !important;
       border: 1px solid rgba(255, 255, 255, 0.1) !important;
       color: #fff !important;
+    }
+
+    /* 输入框需要更高透明度以保证可读性 */
+    .ant-input, .ant-select-selector {
+      background: rgba(255, 255, 255, 0.12) !important;
+      backdrop-filter: blur(15px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      color: #fff !important;
+    }
+    .ant-input::placeholder {
+      color: rgba(255, 255, 255, 0.4) !important;
+    }
+
+    .ant-input-affix-wrapper {
+      background: rgba(255, 255, 255, 0.12) !important;
+      backdrop-filter: blur(15px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    }
+    .ant-input-affix-wrapper input {
+      background: transparent !important;
+      border: none !important;
     }
 
     /* 修复文字颜色 */

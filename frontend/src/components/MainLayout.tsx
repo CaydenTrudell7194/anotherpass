@@ -13,12 +13,12 @@ import { useSite, useSiteBackground } from '../site'
 
 const { Header, Sider, Content } = Layout
 
-const menuItems = (isAdmin: boolean): MenuProps['items'] => {
+const menuItems = (isAdmin: boolean, allowUserNodes: boolean): MenuProps['items'] => {
   const items: MenuProps['items'] = [
     { key: '/', icon: <HomeOutlined />, label: '主页' },
     { key: '/profile', icon: <UserOutlined />, label: '个人中心' },
     { key: '/forward_rules', icon: <UnorderedListOutlined />, label: '转发规则' },
-    { key: '/device_group', icon: <CloudServerOutlined />, label: '单端隧道' },
+    ...(allowUserNodes ? [{ key: '/device_group', icon: <CloudServerOutlined />, label: '单端隧道' }] : []),
     { key: '/node_status', icon: <ApiOutlined />, label: '节点状态' },
     { key: '/affiliate', icon: <GiftOutlined />, label: '推广返利' },
     { key: '/plans', icon: <ShoppingOutlined />, label: '套餐与订单' },
@@ -47,7 +47,6 @@ export default function MainLayout() {
   const location = useLocation()
   const [user, setUser] = useState<any>(null)
   const [collapsed, setCollapsed] = useState(false)
-  const [darkMode, setDarkMode] = useState(false)
   const { settings } = useSite()
   const background = useSiteBackground()
 
@@ -65,40 +64,35 @@ export default function MainLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme={darkMode ? 'dark' : 'light'}>
-        <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: collapsed ? 14 : 18 }}>
+      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="dark">
+        <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: collapsed ? 14 : 18, color: '#fff' }}>
            {collapsed ? settings.site_name.slice(0, 1) : settings.site_name}
         </div>
         <Menu
           mode="inline"
+          theme="dark"
           selectedKeys={[selectedKey]}
           defaultOpenKeys={openKeys}
-          items={menuItems(user?.is_admin)}
+          items={menuItems(user?.is_admin, settings.allow_user_nodes !== false)}
           onClick={({ key }) => navigate(key)}
         />
       </Sider>
       <Layout>
-        <Header style={{ background: darkMode ? '#141414' : '#fff', padding: '0 24px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16 }}>
-          <Switch
-            checkedChildren={<MoonOutlined />}
-            unCheckedChildren={<SunOutlined />}
-            checked={darkMode}
-            onChange={setDarkMode}
-          />
+        <Header style={{ background: 'rgba(0,0,0,0.3)', padding: '0 24px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16 }}>
           <Dropdown menu={{
             items: [
               { key: 'profile', icon: <UserOutlined />, label: '个人中心', onClick: () => navigate('/profile') },
               { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: handleLogout }
             ]
           }}>
-            <Button type="text" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Button type="text" style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#fff' }}>
               <Avatar size="small" icon={<UserOutlined />} />
               {user?.display_name || user?.username}
             </Button>
           </Dropdown>
         </Header>
         <Content style={{ padding: 24, ...background }}>
-          <div style={settings.theme_policy === 'transparent' ? { background: 'rgba(255,255,255,.88)', borderRadius: 12, padding: 20, backdropFilter: 'blur(8px)' } : {}}><Outlet /></div>
+          <div style={settings.theme_policy === 'transparent' ? { background: 'rgba(0,0,0,0.2)', borderRadius: 12, padding: 20, backdropFilter: 'blur(8px)' } : {}}><Outlet /></div>
         </Content>
       </Layout>
     </Layout>

@@ -80,6 +80,9 @@ export default function Settings() {
             <Col xs={24} md={12}><Form.Item name="codepay_merchant_id" label="CodePay 商户ID"><Input placeholder="商户ID" /></Form.Item></Col>
           </Row>
         </Card>
+        <Card title="单端隧道" style={{ marginBottom: 16 }}>
+          <Form.Item name="allow_user_nodes" label="允许用户使用单端隧道" valuePropName="checked" extra="关闭后用户菜单隐藏'单端隧道'，且API拒绝创建新节点"><Switch /></Form.Item>
+        </Card>
         <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving} size="large">保存全部设置</Button>
       </Form>
     </div>

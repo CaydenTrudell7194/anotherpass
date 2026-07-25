@@ -38,6 +38,7 @@ type SiteSettings struct {
 	EpayPid                   string `json:"epay_pid"`
 	CodepayCreateUrl          string `json:"codepay_create_url"`
 	CodepayMerchantId         string `json:"codepay_merchant_id"`
+	AllowUserNodes            bool   `json:"allow_user_nodes"`
 }
 
 type PublicSiteInfo struct {
@@ -45,6 +46,7 @@ type PublicSiteInfo struct {
 	SiteSubtitle        string `json:"site_subtitle"`
 	SiteNotice          string `json:"site_notice"`
 	AllowRegister       bool   `json:"allow_register"`
+	AllowUserNodes      bool   `json:"allow_user_nodes"`
 	ThemePolicy         string `json:"theme_policy"`
 	BackgroundURL       string `json:"background_url"`
 	MobileBackgroundURL string `json:"mobile_background_url"`
@@ -145,7 +147,8 @@ func validateSiteSettings(settings *SiteSettings) string {
 func PublicSiteSettings(c *gin.Context) {
 	settings := LoadSiteSettings()
 	c.JSON(http.StatusOK, PublicSiteInfo{SiteName: settings.SiteName, SiteSubtitle: settings.SiteSubtitle,
-		SiteNotice: settings.SiteNotice, AllowRegister: settings.AllowRegister, ThemePolicy: settings.ThemePolicy,
+		SiteNotice: settings.SiteNotice, AllowRegister: settings.AllowRegister, AllowUserNodes: settings.AllowUserNodes,
+		ThemePolicy:   settings.ThemePolicy,
 		BackgroundURL: settings.BackgroundURL, MobileBackgroundURL: settings.MobileBackgroundURL})
 }
 

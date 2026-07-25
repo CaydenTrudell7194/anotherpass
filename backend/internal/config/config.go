@@ -23,7 +23,7 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		Listen:            getEnv("LISTEN", "0.0.0.0:18888"),
+		Listen:            getEnv("LISTEN", "127.0.0.1:18888"),
 		Database:          getEnv("DATABASE", "sqlite3://data.db"),
 		Key:               getEnv("KEY", ""),
 		FrontendDir:       getEnv("FRONTEND_DIR", "./public"),
