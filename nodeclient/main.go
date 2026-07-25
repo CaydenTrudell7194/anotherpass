@@ -480,21 +480,53 @@ func (p *ProxyServer) handleConnection(src net.Conn) {
 	wg.Wait()
 }
 
+func fetchPublicIP(url string) string {
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 128))
+	if err != nil {
+		return ""
+	}
+	ip := strings.TrimSpace(string(body))
+	if net.ParseIP(ip) != nil {
+		return ip
+	}
+	return ""
+}
+
 func getOutboundIPs() (ip4, ip6 string) {
-	// Try IPv4
-	if conn, err := net.Dial("udp4", "8.8.8.8:80"); err == nil {
-		if host, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
-			ip4 = host
-		}
-		conn.Close()
+	// Try public IPv4
+	ip4 = fetchPublicIP("https://api4.ipify.org")
+	if ip4 == "" {
+		ip4 = fetchPublicIP("http://v4.ipv6-test.com/api/myip.php")
 	}
-	// Try IPv6
-	if conn, err := net.Dial("udp6", "[2001:4860:4860::8888]:80"); err == nil {
-		if host, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
-			ip6 = host
+	if ip4 == "" {
+		if conn, err := net.Dial("udp4", "8.8.8.8:80"); err == nil {
+			if host, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
+				ip4 = host
+			}
+			conn.Close()
 		}
-		conn.Close()
 	}
+
+	// Try public IPv6
+	ip6 = fetchPublicIP("https://api6.ipify.org")
+	if ip6 == "" {
+		ip6 = fetchPublicIP("http://v6.ipv6-test.com/api/myip.php")
+	}
+	if ip6 == "" {
+		if conn, err := net.Dial("udp6", "[2001:4860:4860::8888]:80"); err == nil {
+			if host, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
+				ip6 = host
+			}
+			conn.Close()
+		}
+	}
+
 	if ip4 == "" {
 		ip4 = "0.0.0.0"
 	}

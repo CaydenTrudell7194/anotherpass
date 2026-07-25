@@ -9,7 +9,7 @@ import (
 )
 
 type GeoResult struct {
-	CountryCode string `json:"country_code"`
+	CountryCode string `json:"countryCode"`
 }
 
 type geoCacheEntry struct {
