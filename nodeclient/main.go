@@ -209,6 +209,8 @@ func loadConfig(path string) error {
 type controlMessage struct {
 	Type             string          `json:"type"`
 	IP               string          `json:"ip,omitempty"`
+	IP4              string          `json:"ip4,omitempty"`
+	IP6              string          `json:"ip6,omitempty"`
 	NodeID           int             `json:"node_id,omitempty"`
 	DeviceGroupID    int             `json:"device_group_id,omitempty"`
 	HeartbeatSeconds int             `json:"heartbeat_seconds,omitempty"`
@@ -310,7 +312,8 @@ func runWebSocketSession() (int, bool, error) {
 			}
 		case <-ticker.C:
 			metrics := collectMonitorMetrics()
-			if err := conn.WriteJSON(controlMessage{Type: "heartbeat", IP: getOutboundIP(), Metrics: &metrics}); err != nil {
+			ip4, ip6 := getOutboundIPs()
+			if err := conn.WriteJSON(controlMessage{Type: "heartbeat", IP: ip4, IP4: ip4, IP6: ip6, Metrics: &metrics}); err != nil {
 				return 0, true, err
 			}
 		}
@@ -477,17 +480,25 @@ func (p *ProxyServer) handleConnection(src net.Conn) {
 	wg.Wait()
 }
 
-func getOutboundIP() string {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		return "0.0.0.0"
+func getOutboundIPs() (ip4, ip6 string) {
+	// Try IPv4
+	if conn, err := net.Dial("udp4", "8.8.8.8:80"); err == nil {
+		if host, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
+			ip4 = host
+		}
+		conn.Close()
 	}
-	defer conn.Close()
-	host, _, err := net.SplitHostPort(conn.LocalAddr().String())
-	if err != nil {
-		return ""
+	// Try IPv6
+	if conn, err := net.Dial("udp6", "[2001:4860:4860::8888]:80"); err == nil {
+		if host, _, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
+			ip6 = host
+		}
+		conn.Close()
 	}
-	return host
+	if ip4 == "" {
+		ip4 = "0.0.0.0"
+	}
+	return
 }
 
 func httpGet(url string) []byte {

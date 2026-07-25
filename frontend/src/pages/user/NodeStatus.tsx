@@ -48,6 +48,7 @@ type Node = {
   device_group_id: number
   name: string
   ip: string
+  ip6?: string
   ip4_geo?: string
   ip6_geo?: string
   online: boolean
@@ -221,8 +222,8 @@ export default function NodeStatus() {
       width: 220,
       render: (_, node) => (
         <div style={{lineHeight:1.6}}>
-          {node.ip && <span>{countryFlag(node.ip4_geo || '')} {node.ip}</span>}
-          {!node.ip && <span className="node-status__mono">-</span>}
+          {node.ip4_geo && <span>{countryFlag(node.ip4_geo)} </span>}{node.ip || '-'}
+          {node.ip6_geo && <><br />{countryFlag(node.ip6_geo)} {node.ip6 || ''}</>}
           {node.metrics?.platform && <div className="node-status__mono">{node.metrics.platform} {node.metrics.platform_version} · {node.metrics.arch}</div>}
         </div>
       ),

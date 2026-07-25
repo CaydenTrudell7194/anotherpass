@@ -61,6 +61,8 @@ func NodeHeartbeat(c *gin.Context) {
 	var req struct {
 		Token string `json:"token"`
 		IP    string `json:"ip"`
+		IP4   string `json:"ip4"`
+		IP6   string `json:"ip6"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
@@ -72,7 +74,7 @@ func NodeHeartbeat(c *gin.Context) {
 		return
 	}
 	now := time.Now()
-	updateNodeHeartbeat(&node, req.IP)
+	updateNodeHeartbeat(&node, req.IP, req.IP4, req.IP6)
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "server_time": now.Unix()})
 }
@@ -288,9 +290,9 @@ func loadRulesForGroup(groupID uint) ([]model.ForwardRule, error) {
 	return rules, err
 }
 
-func updateNodeHeartbeat(node *model.Node, ip string) {
+func updateNodeHeartbeat(node *model.Node, ip, ip4, ip6 string) {
 	now := time.Now()
-	values := map[string]interface{}{"last_heartbeat": now, "status": "online", "ip": strings.TrimSpace(ip)}
+	values := map[string]interface{}{"last_heartbeat": now, "status": "online", "ip": strings.TrimSpace(ip), "ip4": strings.TrimSpace(ip4), "ip6": strings.TrimSpace(ip6)}
 	transition := model.DB.Model(&model.Node{}).Where("id = ? AND status <> ?", node.ID, "online").Updates(values)
 	if transition.RowsAffected == 0 {
 		model.DB.Model(&model.Node{}).Where("id = ?", node.ID).Updates(values)
@@ -298,6 +300,8 @@ func updateNodeHeartbeat(node *model.Node, ip string) {
 	node.LastHeartbeat = now
 	node.Status = "online"
 	node.IP = strings.TrimSpace(ip)
+	node.IP4 = strings.TrimSpace(ip4)
+	node.IP6 = strings.TrimSpace(ip6)
 	recountOnlineNodes(node.DeviceGroupID)
 	if transition.Error == nil && transition.RowsAffected == 1 {
 		notifyTelegram("节点上线：" + node.Name)
@@ -329,13 +333,15 @@ func recountOnlineNodes(groupID uint) {
 	model.DB.Model(&model.DeviceGroup{}).Where("id = ?", groupID).Update("online_devices", count)
 }
 
-func updateUserNodeHeartbeat(node *model.UserNode, ip string) {
+func updateUserNodeHeartbeat(node *model.UserNode, ip, ip4, ip6 string) {
 	now := time.Now()
-	values := map[string]interface{}{"last_heartbeat": now, "status": "online", "ip": strings.TrimSpace(ip)}
+	values := map[string]interface{}{"last_heartbeat": now, "status": "online", "ip": strings.TrimSpace(ip), "ip4": strings.TrimSpace(ip4), "ip6": strings.TrimSpace(ip6)}
 	model.DB.Model(&model.UserNode{}).Where("id = ?", node.ID).Updates(values)
 	node.LastHeartbeat = now
 	node.Status = "online"
 	node.IP = strings.TrimSpace(ip)
+	node.IP4 = strings.TrimSpace(ip4)
+	node.IP6 = strings.TrimSpace(ip6)
 	notifyTelegram("用户节点上线：" + node.Name)
 }
 

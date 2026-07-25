@@ -17,6 +17,8 @@ import (
 type nodeControlMessage struct {
 	Type             string              `json:"type"`
 	IP               string              `json:"ip,omitempty"`
+	IP4              string              `json:"ip4,omitempty"`
+	IP6              string              `json:"ip6,omitempty"`
 	NodeID           uint                `json:"node_id,omitempty"`
 	DeviceGroupID    uint                `json:"device_group_id,omitempty"`
 	HeartbeatSeconds int                 `json:"heartbeat_seconds,omitempty"`
@@ -178,7 +180,7 @@ func userNodeWebSocket(c *gin.Context, clientIP string, token string, userNode *
 	if err := session.writeJSON(nodeControlMessage{Type: "hello", NodeID: userNode.ID, HeartbeatSeconds: 1}); err != nil {
 		return
 	}
-	updateUserNodeHeartbeat(userNode, clientIP)
+	updateUserNodeHeartbeat(userNode, clientIP, "", "")
 
 	done := make(chan struct{})
 	lastDBHeartbeat := time.Time{}
@@ -196,7 +198,7 @@ func userNodeWebSocket(c *gin.Context, clientIP string, token string, userNode *
 				_ = conn.SetReadDeadline(time.Now().Add(50 * time.Second))
 				updateUserNodeMonitor(userNode, msg.Metrics)
 				if time.Since(lastDBHeartbeat) >= 10*time.Second {
-					updateUserNodeHeartbeat(userNode, clientIP)
+					updateUserNodeHeartbeat(userNode, clientIP, msg.IP4, msg.IP6)
 					lastDBHeartbeat = time.Now()
 				}
 			}
@@ -308,7 +310,7 @@ func NodeWebSocket(c *gin.Context) {
 	if err := session.writeJSON(nodeControlMessage{Type: "rules_snapshot", Rules: rules}); err != nil {
 		return
 	}
-	updateNodeHeartbeat(&node, clientIP)
+	updateNodeHeartbeat(&node, clientIP, "", "")
 
 	done := make(chan struct{})
 	lastDBHeartbeat := time.Time{}
@@ -326,7 +328,7 @@ func NodeWebSocket(c *gin.Context) {
 				_ = conn.SetReadDeadline(time.Now().Add(50 * time.Second))
 				updateNodeMonitor(node, msg.Metrics)
 				if time.Since(lastDBHeartbeat) >= 10*time.Second {
-					updateNodeHeartbeat(&node, clientIP)
+					updateNodeHeartbeat(&node, clientIP, msg.IP4, msg.IP6)
 					lastDBHeartbeat = time.Now()
 				}
 			}

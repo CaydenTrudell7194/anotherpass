@@ -3,7 +3,6 @@ package handler
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"net"
 	"net/http"
 	"sort"
 	"sync"
@@ -168,7 +167,7 @@ func buildMonitorSnapshot(groups []model.DeviceGroup, nodes []model.Node, userNo
 		entry := nodeMonitorCache.items[node.ID]
 		lastUpdate := entry.UpdatedAt
 		online := node.Status == "online" && (!lastUpdate.IsZero() && now.Sub(lastUpdate) < 5*time.Second || lastUpdate.IsZero() && now.Sub(node.LastHeartbeat) < 20*time.Second)
-		ip4Geo, ip6Geo := lookupNodeGeo(node.IP, seenIPs)
+		ip4Geo, ip6Geo := lookupNodeGeo(node.IP4, node.IP6, seenIPs)
 		view := monitorNodeView{
 			ID: node.ID, DeviceGroupID: node.DeviceGroupID, Name: node.Name, IP: node.IP,
 			IP4Geo: ip4Geo, IP6Geo: ip6Geo, Online: online,
@@ -196,7 +195,7 @@ func buildMonitorSnapshot(groups []model.DeviceGroup, nodes []model.Node, userNo
 		entry := userNodeMonitorCache.items[un.ID]
 		lastUpdate := entry.UpdatedAt
 		online := un.Status == "online" && (!lastUpdate.IsZero() && now.Sub(lastUpdate) < 5*time.Second || lastUpdate.IsZero() && now.Sub(un.LastHeartbeat) < 20*time.Second)
-		ip4Geo, ip6Geo := lookupNodeGeo(un.IP, seenIPs)
+		ip4Geo, ip6Geo := lookupNodeGeo(un.IP4, un.IP6, seenIPs)
 		uview := monitorNodeView{
 			ID: un.ID, Name: un.Name, IP: un.IP,
 			IP4Geo: ip4Geo, IP6Geo: ip6Geo, Online: online,
@@ -220,22 +219,30 @@ func buildMonitorSnapshot(groups []model.DeviceGroup, nodes []model.Node, userNo
 	return gin.H{"server_time": now.Unix(), "groups": result}
 }
 
-func lookupNodeGeo(ip string, seenIPs map[string]bool) (ip4Geo, ip6Geo string) {
-	if ip == "" || seenIPs[ip] {
-		return "", ""
+func lookupNodeGeo(ip4, ip6 string, seenIPs map[string]bool) (ip4Geo, ip6Geo string) {
+	if ip4 != "" && !seenIPs[ip4] {
+		seenIPs[ip4] = true
+		geoCache.RLock()
+		entry, ok := geoCache.items[ip4]
+		geoCache.RUnlock()
+		if !ok {
+			go resolveGeo(ip4)
+		} else {
+			ip4Geo = entry.Result.CountryCode
+		}
 	}
-	seenIPs[ip] = true
-	geoCache.RLock()
-	entry, ok := geoCache.items[ip]
-	geoCache.RUnlock()
-	if !ok {
-		go resolveGeo(ip)
-		return "", ""
+	if ip6 != "" && !seenIPs[ip6] {
+		seenIPs[ip6] = true
+		geoCache.RLock()
+		entry, ok := geoCache.items[ip6]
+		geoCache.RUnlock()
+		if !ok {
+			go resolveGeo(ip6)
+		} else {
+			ip6Geo = entry.Result.CountryCode
+		}
 	}
-	if net.ParseIP(ip).To4() != nil {
-		return entry.Result.CountryCode, ""
-	}
-	return "", entry.Result.CountryCode
+	return
 }
 
 func mapKeys(values map[uint]bool) []uint {

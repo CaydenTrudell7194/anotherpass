@@ -34,6 +34,8 @@ type Node struct {
 	DeviceGroup   DeviceGroup `gorm:"foreignKey:DeviceGroupID" json:"-"`
 	Name          string      `gorm:"size:128" json:"name"`
 	IP            string      `gorm:"size:64" json:"ip"`
+	IP4           string      `gorm:"size:64" json:"ip4"`
+	IP6           string      `gorm:"size:64" json:"ip6"`
 	Token         string      `gorm:"size:256;uniqueIndex" json:"-"`
 	InstanceID    string      `gorm:"size:64;index" json:"instance_id"`
 	EnrollHash    string      `gorm:"size:64;index" json:"-"`

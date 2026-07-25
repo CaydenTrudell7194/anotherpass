@@ -9,6 +9,8 @@ type UserNode struct {
 	Token         string    `gorm:"size:256;uniqueIndex" json:"-"`
 	InstanceID    string    `gorm:"size:64" json:"instance_id"`
 	IP            string    `gorm:"size:64" json:"ip"`
+	IP4           string    `gorm:"size:64" json:"ip4"`
+	IP6           string    `gorm:"size:64" json:"ip6"`
 	Status        string    `gorm:"size:16;default:offline" json:"status"`
 	LastHeartbeat time.Time `json:"last_heartbeat"`
 	CreatedAt     time.Time `json:"created_at"`
