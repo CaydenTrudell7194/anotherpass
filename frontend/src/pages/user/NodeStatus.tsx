@@ -48,6 +48,8 @@ type Node = {
   device_group_id: number
   name: string
   ip: string
+  ip4_geo?: string
+  ip6_geo?: string
   online: boolean
   last_heartbeat: string
   last_update: string
@@ -199,9 +201,9 @@ export default function NodeStatus() {
 
   const columns = useMemo<ColumnsType<Node>>(() => [
     {
-      title: '状态 / IP',
+      title: '状态 / 名称',
       key: 'identity',
-      width: 190,
+      width: 160,
       fixed: 'left',
       render: (_, node) => (
         <div className="node-status__identity">
@@ -209,9 +211,19 @@ export default function NodeStatus() {
             <span className={`node-status__dot ${node.online ? 'is-online' : ''}`} />
             <strong>{node.name || `节点 #${node.id}`}</strong>
           </div>
-          <span className="node-status__mono">{node.ip || '-'}</span>
-          {node.metrics?.ip4_geo && <span className="node-status__mono">{countryFlag(node.metrics.ip4_geo)} {node.metrics.ip4_geo}</span>}
-          {node.metrics?.ip6_geo && <span className="node-status__mono">{countryFlag(node.metrics.ip6_geo)} {node.metrics.ip6_geo}</span>}
+          {node.metrics?.hostname && <span className="node-status__mono">{node.metrics.hostname}</span>}
+        </div>
+      ),
+    },
+    {
+      title: 'IP',
+      key: 'ip',
+      width: 220,
+      render: (_, node) => (
+        <div style={{lineHeight:1.6}}>
+          {node.ip && <span>{countryFlag(node.ip4_geo || '')} {node.ip}</span>}
+          {!node.ip && <span className="node-status__mono">-</span>}
+          {node.metrics?.platform && <div className="node-status__mono">{node.metrics.platform} {node.metrics.platform_version} · {node.metrics.arch}</div>}
         </div>
       ),
     },
@@ -277,18 +289,6 @@ export default function NodeStatus() {
       key: 'disk',
       width: 180,
       render: (_, node) => <MetricProgress value={percent(node.metrics?.disk_used, node.metrics?.disk_total)} detail={`${formatBytes(node.metrics?.disk_used)} / ${formatBytes(node.metrics?.disk_total)}`} />,
-    },
-    {
-      title: '系统',
-      key: 'system',
-      width: 220,
-      render: (_, node) => (
-        <div className="node-status__system">
-          <strong>{node.metrics?.hostname || '-'}</strong>
-          <span>{[node.metrics?.platform, node.metrics?.platform_version, node.metrics?.arch].filter(Boolean).join(' · ') || '-'}</span>
-          <span>Agent {node.metrics?.version || '-'}</span>
-        </div>
-      ),
     },
   ], [])
 
