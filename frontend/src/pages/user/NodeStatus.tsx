@@ -50,6 +50,7 @@ type Node = {
   device_group_id: number
   name: string
   ip: string
+  ip4?: string
   ip6?: string
   ip4_geo?: string
   ip6_geo?: string
@@ -318,7 +319,7 @@ export default function NodeStatus() {
                 const flag4 = countryFlag(node.ip4_geo || node.metrics?.ip4_geo || '')
                 const flag6 = countryFlag(node.ip6_geo || node.metrics?.ip6_geo || '')
 
-                const v4Address = node.ip || ''
+                const v4Address = node.ip4 || node.ip || ''
                 const v6Address = node.ip6 || ''
 
                 return (

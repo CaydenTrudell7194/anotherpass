@@ -313,7 +313,11 @@ func runWebSocketSession() (int, bool, error) {
 		case <-ticker.C:
 			metrics := collectMonitorMetrics()
 			ip4, ip6 := getOutboundIPs()
-			if err := conn.WriteJSON(controlMessage{Type: "heartbeat", IP: ip4, IP4: ip4, IP6: ip6, Metrics: &metrics}); err != nil {
+			ip := ip4
+			if ip == "" || ip == "0.0.0.0" {
+				ip = ip6
+			}
+			if err := conn.WriteJSON(controlMessage{Type: "heartbeat", IP: ip, IP4: ip4, IP6: ip6, Metrics: &metrics}); err != nil {
 				return 0, true, err
 			}
 		}
