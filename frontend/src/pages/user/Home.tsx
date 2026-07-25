@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Alert, Card, Row, Col, Statistic, Descriptions, Tag, Spin, message } from 'antd'
 import { UserOutlined, UnorderedListOutlined, ApiOutlined } from '@ant-design/icons'
-import { getProfile, listForwardRules, listMyDeviceGroups } from '../../api'
+import { errorMessage, getProfile, listForwardRules, listMyDeviceGroups } from '../../api'
 import { useSite } from '../../site'
 
 export default function Home() {
@@ -20,8 +20,8 @@ export default function Home() {
       setUser(profileRes.data)
       setRules(Array.isArray(rulesRes.data) ? rulesRes.data : rulesRes.data?.rules || [])
       setDeviceGroups(Array.isArray(dgRes.data) ? dgRes.data : dgRes.data?.device_groups || [])
-    } catch {
-      message.error('获取数据失败')
+    } catch (err) {
+      message.error(errorMessage(err, '获取数据失败'))
     } finally {
       setLoading(false)
     }
