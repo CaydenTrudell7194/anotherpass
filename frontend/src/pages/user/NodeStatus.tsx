@@ -326,37 +326,30 @@ export default function NodeStatus() {
 
                 return (
                   <div className={`glass-card node-strip ${node.online ? 'is-online' : 'is-offline'}`} key={node.id}>
-                    {/* 第一块：状态 glow + 统一的 IP 与国旗旗帜 (替代节点名标题) */}
+                    {/* 第一块：状态 glow + IP展示 */}
                     <div className="node-strip__section node-strip__identity">
                       <span className={`status-glow ${node.online ? 'is-online' : ''}`} />
                       <div className="node-strip__ips">
                         <div className="ip-entry">
-                          {flag4}
-                          <span className="ip-entry__addr">{v4Address || <span className="text-muted">IPv4 未分配/被隐藏</span>}</span>
+                          <span className="flag-emoji">{flag4 || '🌐'}</span>
+                          <span className="ip-entry__addr">{v4Address || <span className="text-muted">IPv4 未分配</span>}</span>
                         </div>
                         <div className="ip-entry">
-                          {flag6}
-                          <span className="ip-entry__addr">{v6Address || <span className="text-muted">IPv6 未分配/被隐藏</span>}</span>
+                          <span className="flag-emoji">{flag6 || '🌐'}</span>
+                          <span className="ip-entry__addr">{v6Address || <span className="text-muted">IPv6 未分配</span>}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* 第二块：节点 Host & 系统信息 */}
+                    {/* 第二块：节点名及详细信息 */}
                     <div className="node-strip__section node-strip__name-area">
-                      {node.metrics?.hostname ? (
-                        <Tooltip title={
-                          <div>
-                            <strong>{node.metrics.hostname}</strong><br />
-                            OS: {node.metrics.platform} {node.metrics.platform_version} ({node.metrics.arch})<br />
-                            Agent: {node.metrics.version || 'v1.0.0'}
-                          </div>
-                        }>
-                          <span className="node-strip__host"><InfoCircleOutlined /> {node.metrics.hostname}</span>
-                        </Tooltip>
-                      ) : (
-                        <span className="node-strip__name" title={node.name}>
-                          {node.name || `节点 #${node.id}`}
-                        </span>
+                      <span className="node-strip__name" title={node.name}>
+                        {node.name || `节点 #${node.id}`}
+                      </span>
+                      {node.metrics?.hostname && (
+                        <div className="node-strip__host">
+                           <span className="text-muted">{node.metrics.platform} | {node.metrics.arch}</span>
+                        </div>
                       )}
                     </div>
 
