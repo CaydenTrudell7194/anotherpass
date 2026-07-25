@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Empty, Progress, Spin, Table, Tooltip } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
+import { Alert, Empty, Progress, Spin, Tooltip, Badge } from 'antd'
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
@@ -8,8 +7,12 @@ import {
   ClockCircleOutlined,
   CloudServerOutlined,
   DisconnectOutlined,
-  InfoCircleOutlined,
   WifiOutlined,
+  HddOutlined,
+  DashboardOutlined,
+  GlobalOutlined,
+  ClusterOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons'
 import api from '../../api'
 
@@ -100,17 +103,7 @@ const percent = (used: number, total: number) => total > 0
   ? Math.min(100, Math.max(0, number(used) / number(total) * 100))
   : 0
 
-const progressColor = (value: number) => value >= 90 ? '#c71f37' : value >= 75 ? '#d97706' : '#1976a3'
-
-function MetricProgress({ value, detail }: { value: number; detail?: string }) {
-  const normalized = Math.min(100, Math.max(0, number(value)))
-  return (
-    <div className="node-status__progress">
-      <div><strong>{normalized.toFixed(1)}%</strong>{detail && <span>{detail}</span>}</div>
-      <Progress percent={normalized} showInfo={false} size="small" strokeColor={progressColor(normalized)} trailColor="#e7e7e3" />
-    </div>
-  )
-}
+const progressColor = (value: number) => value >= 90 ? '#ef4444' : value >= 75 ? '#f59e0b' : '#3b82f6'
 
 export default function NodeStatus() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
@@ -200,99 +193,6 @@ export default function NodeStatus() {
     }
   }, [])
 
-  const columns = useMemo<ColumnsType<Node>>(() => [
-    {
-      title: '状态 / 名称',
-      key: 'identity',
-      width: 160,
-      fixed: 'left',
-      render: (_, node) => (
-        <div className="node-status__identity">
-          <div className="node-status__node-name">
-            <span className={`node-status__dot ${node.online ? 'is-online' : ''}`} />
-            <strong>{node.name || `节点 #${node.id}`}</strong>
-          </div>
-          {node.metrics?.hostname && <span className="node-status__mono">{node.metrics.hostname}</span>}
-        </div>
-      ),
-    },
-    {
-      title: 'IP',
-      key: 'ip',
-      width: 220,
-      render: (_, node) => (
-        <div style={{lineHeight:1.6}}>
-          {node.ip4_geo && <span>{countryFlag(node.ip4_geo)} </span>}{node.ip || '-'}
-          {node.ip6_geo && <><br />{countryFlag(node.ip6_geo)} {node.ip6 || ''}</>}
-          {node.metrics?.platform && <div className="node-status__mono">{node.metrics.platform} {node.metrics.platform_version} · {node.metrics.arch}</div>}
-        </div>
-      ),
-    },
-    {
-      title: '实时速率',
-      key: 'speed',
-      width: 150,
-      render: (_, node) => (
-        <Tooltip title={`TCP ${number(node.metrics?.tcp_conn_count)} · UDP ${number(node.metrics?.udp_conn_count)}`}>
-          <div className="node-status__traffic">
-            <span className="is-up"><ArrowUpOutlined /> {formatSpeed(node.metrics?.net_out_speed)}</span>
-            <span className="is-down"><ArrowDownOutlined /> {formatSpeed(node.metrics?.net_in_speed)}</span>
-          </div>
-        </Tooltip>
-      ),
-    },
-    {
-      title: '运行时间',
-      key: 'uptime',
-      width: 125,
-      render: (_, node) => (
-        <Tooltip title={<div>启动：{formatUnixTime(node.metrics?.boot_time)}<br />同步：{formatTime(node.last_update || node.last_heartbeat)}</div>}>
-          <span className="node-status__uptime"><ClockCircleOutlined /> {node.online ? formatUptime(node.metrics?.uptime_seconds) : '离线'}</span>
-        </Tooltip>
-      ),
-    },
-    {
-      title: '累计流量',
-      key: 'transfer',
-      width: 145,
-      render: (_, node) => (
-        <div className="node-status__traffic">
-          <span className="is-up"><ArrowUpOutlined /> {formatBytes(node.metrics?.net_out_transfer)}</span>
-          <span className="is-down"><ArrowDownOutlined /> {formatBytes(node.metrics?.net_in_transfer)}</span>
-        </div>
-      ),
-    },
-    {
-      title: 'CPU',
-      key: 'cpu',
-      width: 165,
-      render: (_, node) => (
-        <Tooltip title={<div>{node.metrics?.cpu_model || '未知处理器'}<br />负载 {number(node.metrics?.load1).toFixed(2)} / {number(node.metrics?.load5).toFixed(2)} / {number(node.metrics?.load15).toFixed(2)}<br />进程 {number(node.metrics?.process_count)}</div>}>
-          <div><MetricProgress value={node.metrics?.cpu_percent} /><span className="node-status__hint">负载 {number(node.metrics?.load1).toFixed(2)} · {number(node.metrics?.process_count)} 进程</span></div>
-        </Tooltip>
-      ),
-    },
-    {
-      title: '内存',
-      key: 'memory',
-      width: 180,
-      render: (_, node) => {
-        const value = percent(node.metrics?.mem_used, node.metrics?.mem_total)
-        return (
-          <Tooltip title={`交换空间 ${formatBytes(node.metrics?.swap_used)} / ${formatBytes(node.metrics?.swap_total)}`}>
-            <MetricProgress value={value} detail={`${formatBytes(node.metrics?.mem_used)} / ${formatBytes(node.metrics?.mem_total)}`} />
-          </Tooltip>
-        )
-      },
-    },
-    {
-      title: '磁盘',
-      key: 'disk',
-      width: 180,
-      render: (_, node) => <MetricProgress value={percent(node.metrics?.disk_used, node.metrics?.disk_total)} detail={`${formatBytes(node.metrics?.disk_used)} / ${formatBytes(node.metrics?.disk_total)}`} />,
-    },
-  ], [])
-
   const totals = useMemo(() => {
     const nodes = snapshot?.groups.flatMap(group => group.nodes || []) || []
     return {
@@ -304,138 +204,604 @@ export default function NodeStatus() {
   }, [snapshot])
 
   return (
-    <main className="node-status">
-      <header className="node-status__header">
-        <div>
-          <span className="node-status__kicker">NETWORK OPERATIONS</span>
-          <h1><CloudServerOutlined /> 节点监控</h1>
+    <main className="glass-monitor">
+      {/* 顶部面板 Header */}
+      <header className="glass-monitor__header">
+        <div className="glass-monitor__title-area">
+          <div className="glass-monitor__icon-badge">
+            <CloudServerOutlined />
+          </div>
+          <div>
+            <span className="glass-monitor__sub">REAL-TIME MONITOR</span>
+            <h1>节点探针</h1>
+          </div>
         </div>
-        <div className={`node-status__connection is-${connection}`}>
-          {connection === 'connected' ? <WifiOutlined /> : <DisconnectOutlined />}
-          <span>{connection === 'connected' ? '已连接 · 1秒更新' : connection === 'connecting' ? '正在连接' : '连接中断 · 3秒后重试'}</span>
+        <div className={`glass-monitor__status-badge is-${connection}`}>
+          {connection === 'connected' ? <WifiOutlined className="pulse-icon" /> : <DisconnectOutlined />}
+          <span>
+            {connection === 'connected' ? '已连接 · 1S 实时更新' : connection === 'connecting' ? '正在连接...' : '连接中断 · 3S 后重连'}
+          </span>
         </div>
       </header>
 
-      <section className="node-status__summary" aria-label="节点概览">
-        <div><span>在线节点</span><strong className="is-online">{totals.online}<small> / {totals.total}</small></strong></div>
-        <div><span><ArrowUpOutlined /> 总上传</span><strong>{formatSpeed(totals.up)}</strong></div>
-        <div><span><ArrowDownOutlined /> 总下载</span><strong>{formatSpeed(totals.down)}</strong></div>
-        <div><span>服务器时间</span><strong className="node-status__summary-time">{formatUnixTime(snapshot?.server_time)}</strong></div>
+      {/* 汇总统计信息面板 */}
+      <section className="glass-monitor__summary">
+        <div className="glass-card summary-card">
+          <div className="summary-card__icon text-emerald">
+            <ClusterOutlined />
+          </div>
+          <div className="summary-card__content">
+            <span className="summary-card__label">在线节点</span>
+            <div className="summary-card__val">
+              <span className="text-emerald">{totals.online}</span>
+              <span className="summary-card__total">/ {totals.total}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="glass-card summary-card">
+          <div className="summary-card__icon text-rose">
+            <ArrowUpOutlined />
+          </div>
+          <div className="summary-card__content">
+            <span className="summary-card__label">总上传速率</span>
+            <div className="summary-card__val text-rose">{formatSpeed(totals.up)}</div>
+          </div>
+        </div>
+
+        <div className="glass-card summary-card">
+          <div className="summary-card__icon text-sky">
+            <ArrowDownOutlined />
+          </div>
+          <div className="summary-card__content">
+            <span className="summary-card__label">总下载速率</span>
+            <div className="summary-card__val text-sky">{formatSpeed(totals.down)}</div>
+          </div>
+        </div>
+
+        <div className="glass-card summary-card">
+          <div className="summary-card__icon text-amber">
+            <ClockCircleOutlined />
+          </div>
+          <div className="summary-card__content">
+            <span className="summary-card__label">服务器时间</span>
+            <div className="summary-card__val summary-card__time">
+              {formatUnixTime(snapshot?.server_time)}
+            </div>
+          </div>
+        </div>
       </section>
 
-      {error && <Alert className="node-status__alert" type="error" showIcon message={error} />}
+      {error && <Alert className="glass-monitor__alert" type="error" showIcon message={error} />}
 
       {!snapshot && !error && (
-        <div className="node-status__state"><Spin size="large" /><span>正在接入监控数据</span></div>
+        <div className="glass-monitor__state">
+          <Spin size="large" />
+          <span>正在连接实时数据源...</span>
+        </div>
       )}
 
       {snapshot && snapshot.groups.length === 0 && (
-        <div className="node-status__state"><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无节点分组" /></div>
+        <div className="glass-monitor__state">
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无节点分组数据" />
+        </div>
       )}
 
+      {/* 按设备组展示磨砂玻璃卡片瀑布流 */}
       {snapshot?.groups.map(group => {
         const groupUp = (group.nodes || []).reduce((sum, node) => sum + number(node.metrics?.net_out_speed), 0)
         const groupDown = (group.nodes || []).reduce((sum, node) => sum + number(node.metrics?.net_in_speed), 0)
-        const online = (group.nodes || []).filter(node => node.online).length
+        const onlineCount = (group.nodes || []).filter(node => node.online).length
+
         return (
-          <section className="node-status__group" key={group.id}>
-            <div className="node-status__group-heading">
-              <div>
-                <span className="node-status__group-index">GROUP {String(group.id).padStart(2, '0')}</span>
+          <section className="glass-monitor__group" key={group.id}>
+            <div className="group-header">
+              <div className="group-header__left">
+                <span className="group-header__tag">ID: {group.id}</span>
                 <h2>{group.name}</h2>
-                <span className="node-status__group-count"><CheckCircleFilled /> {online}/{group.nodes?.length || 0} 在线</span>
+                <Badge
+                  count={`${onlineCount} / ${group.nodes?.length || 0} 在线`}
+                  style={{ backgroundColor: onlineCount > 0 ? '#10b981' : '#6b7280', borderRadius: '12px', padding: '0 10px', fontSize: '12px' }}
+                />
               </div>
-              <div className="node-status__group-speed">
-                <span><ArrowUpOutlined /> {formatSpeed(groupUp)}</span>
-                <span><ArrowDownOutlined /> {formatSpeed(groupDown)}</span>
+              <div className="group-header__speed">
+                <span className="text-rose"><ArrowUpOutlined /> {formatSpeed(groupUp)}</span>
+                <span className="text-sky"><ArrowDownOutlined /> {formatSpeed(groupDown)}</span>
               </div>
             </div>
-            <Table<Node>
-              rowKey="id"
-              columns={columns}
-              dataSource={group.nodes || []}
-              pagination={false}
-              size="small"
-              scroll={{ x: 1355 }}
-              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该分组暂无节点" /> }}
-            />
+
+            {/* 卡片网格 Grid */}
+            <div className="glass-grid">
+              {(group.nodes || []).map(node => {
+                const cpuVal = number(node.metrics?.cpu_percent)
+                const memVal = percent(node.metrics?.mem_used, node.metrics?.mem_total)
+                const diskVal = percent(node.metrics?.disk_used, node.metrics?.disk_total)
+                const flag4 = countryFlag(node.ip4_geo || node.metrics?.ip4_geo || '')
+                const flag6 = countryFlag(node.ip6_geo || node.metrics?.ip6_geo || '')
+
+                return (
+                  <div className={`glass-card node-card ${node.online ? 'is-online' : 'is-offline'}`} key={node.id}>
+                    {/* 卡片头部：状态呼吸灯、节点名、国旗 */}
+                    <div className="node-card__header">
+                      <div className="node-card__title">
+                        <span className={`status-glow ${node.online ? 'is-online' : ''}`} />
+                        <span className="node-card__name" title={node.name}>
+                          {node.name || `节点 #${node.id}`}
+                        </span>
+                      </div>
+                      <div className="node-card__flags">
+                        {flag4 && <span className="flag-emoji" title={node.ip4_geo}>{flag4}</span>}
+                        {flag6 && <span className="flag-emoji" title={node.ip6_geo}>{flag6}</span>}
+                      </div>
+                    </div>
+
+                    {/* 卡片子头部：IP 和 挂载系统信息 */}
+                    <div className="node-card__sub">
+                      <span className="node-card__ip">
+                        {node.ip ? node.ip : <span className="text-muted">IP 暂无/已保护</span>}
+                      </span>
+                      {node.metrics?.hostname && (
+                        <Tooltip title={
+                          <div>
+                            <strong>{node.metrics.hostname}</strong><br />
+                            OS: {node.metrics.platform} {node.metrics.platform_version} ({node.metrics.arch})<br />
+                            Agent: {node.metrics.version || 'v1.0.0'}
+                          </div>
+                        }>
+                          <span className="node-card__host">
+                            <InfoCircleOutlined /> {node.metrics.hostname}
+                          </span>
+                        </Tooltip>
+                      )}
+                    </div>
+
+                    {/* 实时速率 & 运行时间 */}
+                    <div className="node-card__stats-row">
+                      <Tooltip title={`TCP 连接: ${number(node.metrics?.tcp_conn_count)} | UDP 连接: ${number(node.metrics?.udp_conn_count)}`}>
+                        <div className="node-card__speed">
+                          <span className="text-rose"><ArrowUpOutlined /> {formatSpeed(node.metrics?.net_out_speed)}</span>
+                          <span className="text-sky"><ArrowDownOutlined /> {formatSpeed(node.metrics?.net_in_speed)}</span>
+                        </div>
+                      </Tooltip>
+                      <Tooltip title={
+                        <div>
+                          开机时间：{formatUnixTime(node.metrics?.boot_time)}<br />
+                          上次同步：{formatTime(node.last_update || node.last_heartbeat)}
+                        </div>
+                      }>
+                        <div className="node-card__uptime">
+                          <ClockCircleOutlined /> {node.online ? formatUptime(node.metrics?.uptime_seconds) : '离线'}
+                        </div>
+                      </Tooltip>
+                    </div>
+
+                    {/* 资源使用率 (CPU / 内存 / 磁盘) 磨砂精致进度条 */}
+                    <div className="node-card__metrics">
+                      {/* CPU */}
+                      <Tooltip title={
+                        <div>
+                          型号: {node.metrics?.cpu_model || '未知 CPU'}<br />
+                          负载: {number(node.metrics?.load1).toFixed(2)} / {number(node.metrics?.load5).toFixed(2)} / {number(node.metrics?.load15).toFixed(2)}<br />
+                          进程数: {number(node.metrics?.process_count)}
+                        </div>
+                      }>
+                        <div className="metric-row">
+                          <div className="metric-label">
+                            <span><DashboardOutlined /> CPU</span>
+                            <strong>{cpuVal.toFixed(1)}%</strong>
+                          </div>
+                          <Progress percent={cpuVal} showInfo={false} size="small" strokeColor={progressColor(cpuVal)} trailColor="rgba(255,255,255,0.15)" />
+                        </div>
+                      </Tooltip>
+
+                      {/* 内存 */}
+                      <Tooltip title={`Swap: ${formatBytes(node.metrics?.swap_used)} / ${formatBytes(node.metrics?.swap_total)}`}>
+                        <div className="metric-row">
+                          <div className="metric-label">
+                            <span><GlobalOutlined /> 内存</span>
+                            <strong>{formatBytes(node.metrics?.mem_used)} / {formatBytes(node.metrics?.mem_total)}</strong>
+                          </div>
+                          <Progress percent={memVal} showInfo={false} size="small" strokeColor={progressColor(memVal)} trailColor="rgba(255,255,255,0.15)" />
+                        </div>
+                      </Tooltip>
+
+                      {/* 磁盘 */}
+                      <div className="metric-row">
+                        <div className="metric-label">
+                          <span><HddOutlined /> 磁盘</span>
+                          <strong>{formatBytes(node.metrics?.disk_used)} / {formatBytes(node.metrics?.disk_total)}</strong>
+                        </div>
+                        <Progress percent={diskVal} showInfo={false} size="small" strokeColor={progressColor(diskVal)} trailColor="rgba(255,255,255,0.15)" />
+                      </div>
+                    </div>
+
+                    {/* 底部流量总和 */}
+                    <div className="node-card__footer">
+                      <span>累计流量</span>
+                      <div>
+                        <span className="text-rose">↑ {formatBytes(node.metrics?.net_out_transfer)}</span>
+                        <span className="text-sky" style={{ marginLeft: 8 }}>↓ {formatBytes(node.metrics?.net_in_transfer)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </section>
         )
       })}
 
       <style>{`
-        .node-status { --ink:#171717; --paper:#f7f7f3; --line:#d6d6d0; --red:#c71f37; --blue:#1976a3; color:var(--ink); background:var(--paper); min-height:100%; padding:28px clamp(16px,3vw,42px) 48px; font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-        .node-status__header { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; padding-bottom:18px; border-bottom:3px solid var(--ink); }
-        .node-status__kicker,.node-status__group-index { display:block; margin-bottom:5px; color:#666; font-size:10px; font-weight:800; letter-spacing:1.8px; }
-        .node-status h1 { margin:0; font-family:Georgia,"Times New Roman",serif; font-size:clamp(28px,4vw,43px); line-height:1; letter-spacing:0; }
-        .node-status h1 .anticon { margin-right:10px; color:var(--red); font-size:.75em; }
-        .node-status__connection { display:flex; align-items:center; gap:8px; padding-bottom:3px; font-size:12px; font-weight:700; white-space:nowrap; }
-        .node-status__connection .anticon { font-size:15px; }
-        .node-status__connection.is-connected { color:#27704b; }
-        .node-status__connection.is-connecting { color:#a36208; }
-        .node-status__connection.is-disconnected { color:var(--red); }
-        .node-status__summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border-bottom:1px solid var(--ink); }
-        .node-status__summary>div { min-width:0; padding:16px 18px; border-right:1px solid var(--line); }
-        .node-status__summary>div:first-child { padding-left:0; }
-        .node-status__summary>div:last-child { border-right:0; }
-        .node-status__summary span { display:block; margin-bottom:5px; color:#666; font-size:11px; font-weight:700; }
-        .node-status__summary strong { display:block; overflow:hidden; font-family:Georgia,"Times New Roman",serif; font-size:24px; line-height:1.15; text-overflow:ellipsis; white-space:nowrap; }
-        .node-status__summary strong.is-online { color:#27704b; font-size:30px; }
-        .node-status__summary strong small { color:#777; font-size:16px; font-weight:400; }
-        .node-status__summary .node-status__summary-time { font-family:inherit; font-size:14px; line-height:28px; }
-        .node-status__alert { margin:18px 0 0; border-radius:0; }
-        .node-status__state { display:flex; min-height:260px; align-items:center; justify-content:center; flex-direction:column; gap:14px; color:#777; font-size:13px; }
-        .node-status__group { padding-top:30px; }
-        .node-status__group+.node-status__group { margin-top:12px; border-top:1px solid var(--ink); }
-        .node-status__group-heading { display:flex; min-height:52px; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:10px; }
-        .node-status__group-heading>div:first-child { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
-        .node-status__group-index { width:100%; margin:0 0 -7px; }
-        .node-status h2 { margin:0; font-family:Georgia,"Times New Roman",serif; font-size:23px; line-height:1.2; letter-spacing:0; }
-        .node-status__group-count { color:#27704b; font-size:11px; font-weight:700; }
-        .node-status__group-speed { display:flex; gap:18px; padding-bottom:3px; font:700 12px ui-monospace,SFMono-Regular,Consolas,monospace; white-space:nowrap; }
-        .node-status__group-speed span:first-child,.is-up { color:var(--red); }
-        .node-status__group-speed span:last-child,.is-down { color:var(--blue); }
-        .node-status .ant-table-wrapper { border-top:2px solid var(--ink); }
-        .node-status .ant-table { background:transparent; border-radius:0; font-size:12px; }
-        .node-status .ant-table-container,.node-status .ant-table-content,.node-status .ant-table-cell { border-radius:0!important; }
-        .node-status .ant-table-thead>tr>th { padding:8px 10px!important; background:#ebebe6!important; border-bottom:1px solid var(--ink)!important; color:#555; font-size:10px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; }
-        .node-status .ant-table-tbody>tr>td { padding:9px 10px!important; background:var(--paper); border-bottom:1px solid var(--line); vertical-align:middle; }
-        .node-status .ant-table-tbody>tr:hover>td { background:#f0f0eb!important; }
-        .node-status .ant-table-cell-fix-left { background:var(--paper)!important; }
-        .node-status__identity,.node-status__traffic,.node-status__system { display:flex; flex-direction:column; gap:3px; min-width:0; }
-        .node-status__node-name { display:flex; align-items:center; gap:7px; min-width:0; }
-        .node-status__node-name strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .node-status__dot { width:7px; height:7px; flex:none; border-radius:50%; background:#aaa; box-shadow:0 0 0 2px #ddd; }
-        .node-status__dot.is-online { background:#258554; box-shadow:0 0 0 2px #cce4d7; }
-        .node-status__mono,.node-status__traffic { font:11px ui-monospace,SFMono-Regular,Consolas,monospace; }
-        .node-status__mono,.node-status__system span,.node-status__hint { color:#747474; }
-        .node-status__traffic span { white-space:nowrap; }
-        .node-status__uptime { color:#444; white-space:nowrap; }
-        .node-status__uptime .anticon { margin-right:4px; color:#777; }
-        .node-status__progress { width:100%; }
-        .node-status__progress>div { display:flex; justify-content:space-between; gap:5px; margin-bottom:1px; font-size:10px; white-space:nowrap; }
-        .node-status__progress strong { font-size:11px; }
-        .node-status__progress span { color:#747474; overflow:hidden; text-overflow:ellipsis; }
-        .node-status__progress .ant-progress { margin:0; line-height:1; }
-        .node-status__progress .ant-progress-inner { border-radius:0; }
-        .node-status__progress .ant-progress-bg { border-radius:0!important; }
-        .node-status__hint { display:block; overflow:hidden; margin-top:2px; font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
-        .node-status__system strong,.node-status__system span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .node-status__system span { font-size:10px; }
-        @media (max-width:700px) {
-          .node-status { padding:20px 12px 36px; }
-          .node-status__header { align-items:flex-start; flex-direction:column; gap:13px; }
-          .node-status__connection { padding:0; }
-          .node-status__summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
-          .node-status__summary>div { padding:12px 10px; border-bottom:1px solid var(--line); }
-          .node-status__summary>div:nth-child(odd) { padding-left:0; }
-          .node-status__summary>div:nth-child(even) { border-right:0; }
-          .node-status__summary>div:nth-child(n+3) { border-bottom:0; }
-          .node-status__summary strong { font-size:19px; }
-          .node-status__summary strong.is-online { font-size:25px; }
-          .node-status__group { padding-top:24px; }
-          .node-status__group-heading { align-items:flex-start; flex-direction:column; gap:8px; }
-          .node-status__group-speed { width:100%; justify-content:space-between; }
+        /* Glassmorphism Monitor Core Styles */
+        .glass-monitor {
+          --glass-bg: rgba(255, 255, 255, 0.45);
+          --glass-border: rgba(255, 255, 255, 0.6);
+          --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
+          --card-bg: rgba(255, 255, 255, 0.65);
+          --text-primary: #1e293b;
+          --text-secondary: #64748b;
+          --text-muted: #94a3b8;
+          min-height: 100vh;
+          padding: 24px;
+          color: var(--text-primary);
+          transition: all 0.3s ease;
+        }
+
+        /* 暗色主题毛玻璃覆盖 */
+        .my-theme-dark .glass-monitor {
+          --glass-bg: rgba(15, 23, 42, 0.55);
+          --glass-border: rgba(255, 255, 255, 0.1);
+          --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+          --card-bg: rgba(30, 41, 59, 0.65);
+          --text-primary: #f8fafc;
+          --text-secondary: #94a3b8;
+          --text-muted: #64748b;
+        }
+
+        .text-rose { color: #f43f5e !important; }
+        .text-sky { color: #0284c7 !important; }
+        .text-emerald { color: #10b981 !important; }
+        .text-amber { color: #f59e0b !important; }
+        .text-muted { color: var(--text-muted); }
+
+        /* 通用毛玻璃卡片 */
+        .glass-card {
+          background: var(--card-bg);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid var(--glass-border);
+          box-shadow: var(--glass-shadow);
+          border-radius: 16px;
+          padding: 16px;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .glass-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.15);
+        }
+
+        /* Header 区域 */
+        .glass-monitor__header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 24px;
+          padding-bottom: 16px;
+          border-bottom: 1px solid var(--glass-border);
+        }
+
+        .glass-monitor__title-area {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .glass-monitor__icon-badge {
+          width: 48px;
+          height: 48px;
+          border-radius: 14px;
+          background: linear-gradient(135deg, #3b82f6, #6366f1);
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 24px;
+          box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+        }
+
+        .glass-monitor__sub {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 1.5px;
+          color: var(--text-secondary);
+        }
+
+        .glass-monitor h1 {
+          margin: 0;
+          font-size: 24px;
+          font-weight: 800;
+          color: var(--text-primary);
+        }
+
+        .glass-monitor__status-badge {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 16px;
+          border-radius: 20px;
+          font-size: 13px;
+          font-weight: 600;
+          background: var(--glass-bg);
+          border: 1px solid var(--glass-border);
+          backdrop-filter: blur(12px);
+        }
+
+        .glass-monitor__status-badge.is-connected { color: #10b981; }
+        .glass-monitor__status-badge.is-connecting { color: #f59e0b; }
+        .glass-monitor__status-badge.is-disconnected { color: #ef4444; }
+
+        .pulse-icon {
+          animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse-ring {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.1); }
+        }
+
+        /* 汇总四元组 */
+        .glass-monitor__summary {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 16px;
+          margin-bottom: 32px;
+        }
+
+        .summary-card {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .summary-card__icon {
+          font-size: 28px;
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.2);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .summary-card__label {
+          font-size: 12px;
+          color: var(--text-secondary);
+          display: block;
+          margin-bottom: 2px;
+        }
+
+        .summary-card__val {
+          font-size: 20px;
+          font-weight: 700;
+          line-height: 1.2;
+        }
+
+        .summary-card__total {
+          font-size: 14px;
+          color: var(--text-muted);
+          margin-left: 4px;
+        }
+
+        .summary-card__time {
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        /* 设备组 Section */
+        .glass-monitor__group {
+          margin-bottom: 36px;
+        }
+
+        .group-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 16px;
+          padding: 0 4px;
+        }
+
+        .group-header__left {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .group-header__tag {
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--text-secondary);
+          background: var(--glass-bg);
+          padding: 2px 8px;
+          border-radius: 6px;
+          border: 1px solid var(--glass-border);
+        }
+
+        .group-header h2 {
+          margin: 0;
+          font-size: 18px;
+          font-weight: 700;
+          color: var(--text-primary);
+        }
+
+        .group-header__speed {
+          display: flex;
+          gap: 16px;
+          font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+          font-weight: 700;
+          font-size: 13px;
+        }
+
+        /* 节点卡片 Grid */
+        .glass-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+          gap: 16px;
+        }
+
+        .node-card {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .node-card.is-offline {
+          opacity: 0.65;
+        }
+
+        .node-card__header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .node-card__title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          max-width: 80%;
+        }
+
+        .node-card__name {
+          font-weight: 700;
+          font-size: 15px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: var(--text-primary);
+        }
+
+        /* 呼吸灯 Glow */
+        .status-glow {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: #ef4444;
+          box-shadow: 0 0 8px #ef4444;
+          flex-shrink: 0;
+          transition: all 0.3s ease;
+        }
+
+        .status-glow.is-online {
+          background: #10b981;
+          box-shadow: 0 0 10px #10b981;
+        }
+
+        .node-card__flags {
+          font-size: 18px;
+          display: flex;
+          gap: 4px;
+        }
+
+        .node-card__sub {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 12px;
+          color: var(--text-secondary);
+        }
+
+        .node-card__ip {
+          font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+          font-weight: 600;
+        }
+
+        .node-card__host {
+          cursor: help;
+          max-width: 120px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .node-card__stats-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: rgba(0, 0, 0, 0.03);
+          padding: 8px 12px;
+          border-radius: 10px;
+          font-size: 12px;
+        }
+
+        .my-theme-dark .node-card__stats-row {
+          background: rgba(255, 255, 255, 0.04);
+        }
+
+        .node-card__speed {
+          display: flex;
+          gap: 12px;
+          font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+          font-weight: 700;
+        }
+
+        .node-card__uptime {
+          color: var(--text-secondary);
+          font-size: 11px;
+        }
+
+        /* 指标 Progress 区域 */
+        .node-card__metrics {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .metric-row {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .metric-label {
+          display: flex;
+          justify-content: space-between;
+          font-size: 11px;
+          color: var(--text-secondary);
+        }
+
+        .metric-label strong {
+          color: var(--text-primary);
+        }
+
+        .node-card__footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-top: 1px dashed var(--glass-border);
+          padding-top: 8px;
+          font-size: 11px;
+          color: var(--text-secondary);
+          font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        }
+
+        .glass-monitor__state {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 200px;
+          gap: 12px;
+          color: var(--text-secondary);
+        }
+
+        @media (max-width: 640px) {
+          .glass-monitor { padding: 16px; }
+          .glass-monitor__header { flex-direction: column; align-items: flex-start; gap: 12px; }
+          .glass-grid { grid-template-columns: 1fr; }
         }
       `}</style>
     </main>
