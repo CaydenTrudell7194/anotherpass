@@ -718,11 +718,17 @@ export default function NodeStatus() {
           line-height: 1.3;
         }
 
-        .ip-entry__flag {
+        .flag-emoji {
           font-size: 20px;
           line-height: 1;
           flex-shrink: 0;
-          font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Twemoji Mozilla', 'EmojiOne Color', sans-serif;
+          display: inline-flex;
+          align-items: center;
+        }
+
+        .flag-emoji .fi {
+          border-radius: 2px;
+          box-shadow: 0 0 2px rgba(0,0,0,0.15);
         }
 
         .ip-entry__addr {
