@@ -79,12 +79,35 @@ func AdminDashboard(c *gin.Context) {
 }
 
 func ListUsers(c *gin.Context) {
+	actorID := c.GetUint("user_id")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 200 {
+		limit = 50
+	}
+	offset := (page - 1) * limit
+	var total int64
+	model.DB.Model(&model.User{}).Count(&total)
 	var users []model.User
-	model.DB.Omit("password").Order("id desc").Find(&users)
-	c.JSON(http.StatusOK, users)
+	model.DB.Omit("password").Order("id desc").Offset(offset).Limit(limit).Find(&users)
+	type UserWithRuleCount struct {
+		model.User
+		RuleCount int64 `json:"rule_count"`
+	}
+	result := make([]UserWithRuleCount, len(users))
+	for i, u := range users {
+		var rc int64
+		model.DB.Model(&model.ForwardRule{}).Where("user_id = ?", u.ID).Count(&rc)
+		result[i] = UserWithRuleCount{User: u, RuleCount: rc}
+	}
+	c.JSON(http.StatusOK, gin.H{"users": result, "total": total, "page": page, "limit": limit})
 }
 
 func CreateUser(c *gin.Context) {
+	actorID := c.GetUint("user_id")
 	var input struct {
 		Username     string    `json:"username"`
 		Password     string    `json:"password"`
@@ -131,11 +154,13 @@ func CreateUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建失败，用户名可能已存在"})
 		return
 	}
+	auditLog(actorID, "create_user", &user.ID, "创建用户: "+user.Username)
 	user.Password = ""
 	c.JSON(http.StatusOK, user)
 }
 
 func UpdateUser(c *gin.Context) {
+	actorID := c.GetUint("user_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID无效"})

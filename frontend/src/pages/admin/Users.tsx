@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Table, Button, Modal, Form, Input, InputNumber, Select, DatePicker, Switch, Popconfirm, Space, Progress, Tag, message, Tooltip } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, WalletOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, WalletOutlined, OrderedListOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { useNavigate } from 'react-router-dom'
 import { listUsers, createUser, updateUser, deleteUser, listUserGroups, adminSetBalance } from '../../api'
 
 interface User {
@@ -13,6 +14,7 @@ interface User {
   traffic_used: number
   traffic_limit: number
   rule_limit: number
+  rule_count: number
   expire_at: string | null
   created_at: string
   balance_cents: number
@@ -33,6 +35,7 @@ const Users: React.FC = () => {
   const [submitting, setSubmitting] = useState(false)
   const [balanceUser, setBalanceUser] = useState<User | null>(null)
   const [balanceForm] = Form.useForm()
+  const navigate = useNavigate()
 
   useEffect(() => {
     fetchUsers()
@@ -43,7 +46,8 @@ const Users: React.FC = () => {
     setLoading(true)
     try {
       const res = await listUsers()
-      setUsers(res.data || res)
+      const data = res.data?.users || res.data || []
+      setUsers(Array.isArray(data) ? data : data)
     } catch {
       message.error('获取用户列表失败')
     } finally {
@@ -137,6 +141,7 @@ const Users: React.FC = () => {
     { title: '用户名', dataIndex: 'username', key: 'username' },
     { title: '显示名', dataIndex: 'display_name', key: 'display_name' },
     { title: '用户组ID', dataIndex: 'user_group_id', key: 'user_group_id' },
+    { title: '规则数', dataIndex: 'rule_count', key: 'rule_count', width: 80 },
     { title: '余额', dataIndex: 'balance_cents', render: (v:number) => `¥${((v||0)/100).toFixed(2)}` },
     {
       title: '状态',
@@ -168,11 +173,14 @@ const Users: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 160,
+      width: 260,
       render: (_: any, record: User) => (
         <Space>
           <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             编辑
+          </Button>
+          <Button type="link" icon={<OrderedListOutlined />} onClick={() => navigate(`/admin/users/${record.id}/rules`)}>
+            规则
           </Button>
           <Button type="link" icon={<WalletOutlined />} onClick={() => { setBalanceUser(record); balanceForm.setFieldsValue({balance_yuan:(record.balance_cents||0)/100,reason:''}) }}>设置余额</Button>
           <Popconfirm title="确定删除此用户？" onConfirm={() => handleDelete(record.id)} okText="确定" cancelText="取消">

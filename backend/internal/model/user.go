@@ -24,5 +24,7 @@ type UserGroup struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	Name        string    `gorm:"uniqueIndex;size:64" json:"name"`
 	Description string    `gorm:"size:256" json:"description"`
+	TrafficLimit int64    `gorm:"default:0" json:"traffic_limit"`
+	RuleLimit    int      `gorm:"default:100" json:"rule_limit"`
 	CreatedAt   time.Time `json:"created_at"`
 }

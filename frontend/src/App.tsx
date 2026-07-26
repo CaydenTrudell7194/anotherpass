@@ -21,6 +21,7 @@ import AdminOrders from './pages/admin/Orders'
 import Affiliate from './pages/user/Affiliate'
 import RedeemCodes from './pages/admin/RedeemCodes'
 import AdminAffiliates from './pages/admin/Affiliates'
+import UserRules from './pages/admin/UserRules'
 
 const isLoggedIn = () => !!localStorage.getItem('token')
 
@@ -85,6 +86,7 @@ export default function App() {
             <Route path="admin/orders" element={<AdminOrders />} />
             <Route path="admin/redeem-codes" element={<RedeemCodes />} />
             <Route path="admin/affiliates" element={<AdminAffiliates />} />
+            <Route path="admin/users/:userId/rules" element={<UserRules />} />
           </Route>
         </Routes>
       </ConfigProvider>

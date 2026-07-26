@@ -29,6 +29,7 @@ type servicePlanInput struct {
 	PriceCents   *int64  `json:"price_cents"`
 	DurationDays *int    `json:"duration_days"`
 	RuleLimit    *int    `json:"rule_limit"`
+	TrafficLimit *int64  `json:"traffic_limit"`
 	UserGroupID  *uint   `json:"user_group_id"`
 	Enabled      *bool   `json:"enabled"`
 }
@@ -80,7 +81,7 @@ func CreateOrder(c *gin.Context) {
 		}
 		order = model.Order{
 			UserID: userID, PlanID: plan.ID, PlanName: plan.Name, PlanPriceCents: plan.PriceCents,
-			PlanDurationDays: plan.DurationDays, PlanRuleLimit: plan.RuleLimit,
+			PlanDurationDays: plan.DurationDays, PlanRuleLimit: plan.RuleLimit, PlanTrafficLimit: plan.TrafficLimit,
 			PlanUserGroupID: plan.UserGroupID, Status: model.OrderStatusPending, UserNote: input.UserNote,
 			PaymentMethod: model.PaymentMethodManual,
 		}
@@ -307,6 +308,9 @@ func fulfillOrder(tx *gorm.DB, order *model.Order, now time.Time) error {
 	updates := map[string]interface{}{
 		"rule_limit": order.PlanRuleLimit, "expire_at": base.AddDate(0, 0, order.PlanDurationDays), "updated_at": now,
 	}
+	if order.PlanTrafficLimit > 0 {
+		updates["traffic_limit"] = order.PlanTrafficLimit
+	}
 	if order.PlanUserGroupID != nil {
 		var count int64
 		if err := tx.Model(&model.UserGroup{}).Where("id = ?", *order.PlanUserGroupID).Count(&count).Error; err != nil || count != 1 {
@@ -332,6 +336,9 @@ func applyServicePlanInput(plan *model.ServicePlan, input servicePlanInput, crea
 	}
 	if input.RuleLimit != nil {
 		plan.RuleLimit = *input.RuleLimit
+	}
+	if input.TrafficLimit != nil {
+		plan.TrafficLimit = *input.TrafficLimit
 	}
 	if input.UserGroupID != nil {
 		if *input.UserGroupID == 0 {

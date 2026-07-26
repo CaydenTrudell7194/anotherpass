@@ -28,6 +28,7 @@ type ServicePlan struct {
 	PriceCents   int64     `gorm:"not null" json:"price_cents"`
 	DurationDays int       `gorm:"not null" json:"duration_days"`
 	RuleLimit    int       `gorm:"not null" json:"rule_limit"`
+	TrafficLimit int64     `gorm:"default:0" json:"traffic_limit"`
 	UserGroupID  *uint     `json:"user_group_id,omitempty"`
 	Enabled      bool      `gorm:"not null;index" json:"enabled"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -35,25 +36,26 @@ type ServicePlan struct {
 }
 
 type Order struct {
-	ID               uint       `gorm:"primaryKey" json:"id"`
-	UserID           uint       `gorm:"not null;index:idx_orders_user_status" json:"user_id"`
-	PlanID           uint       `gorm:"not null;index" json:"plan_id"`
-	PlanName         string     `gorm:"size:100;not null" json:"plan_name"`
-	PlanPriceCents   int64      `gorm:"not null" json:"plan_price_cents"`
-	PlanDurationDays int        `gorm:"not null" json:"plan_duration_days"`
-	PlanRuleLimit    int        `gorm:"not null" json:"plan_rule_limit"`
-	PlanUserGroupID  *uint      `json:"plan_user_group_id,omitempty"`
-	Status           string     `gorm:"size:16;not null;index:idx_orders_user_status" json:"status"`
-	UserNote         string     `gorm:"size:500" json:"user_note"`
-	AdminNote        string     `gorm:"size:500" json:"admin_note"`
-	ReviewedBy       *uint      `json:"reviewed_by,omitempty"`
-	ReviewedAt       *time.Time `json:"reviewed_at,omitempty"`
-	PaymentMethod    string     `gorm:"size:16;not null;default:manual" json:"payment_method"`
-	PaidCents        int64      `gorm:"not null;default:0" json:"paid_cents"`
-	IdempotencyKey   string     `gorm:"size:128;index" json:"-"`
-	FulfilledAt      *time.Time `json:"fulfilled_at,omitempty"`
-	CreatedAt        time.Time  `gorm:"index" json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	ID                uint       `gorm:"primaryKey" json:"id"`
+	UserID            uint       `gorm:"not null;index:idx_orders_user_status" json:"user_id"`
+	PlanID            uint       `gorm:"not null;index" json:"plan_id"`
+	PlanName          string     `gorm:"size:100;not null" json:"plan_name"`
+	PlanPriceCents    int64      `gorm:"not null" json:"plan_price_cents"`
+	PlanDurationDays  int        `gorm:"not null" json:"plan_duration_days"`
+	PlanRuleLimit     int        `gorm:"not null" json:"plan_rule_limit"`
+	PlanTrafficLimit  int64      `gorm:"default:0" json:"plan_traffic_limit"`
+	PlanUserGroupID   *uint      `json:"plan_user_group_id,omitempty"`
+	Status            string     `gorm:"size:16;not null;index:idx_orders_user_status" json:"status"`
+	UserNote          string     `gorm:"size:500" json:"user_note"`
+	AdminNote         string     `gorm:"size:500" json:"admin_note"`
+	ReviewedBy        *uint      `json:"reviewed_by,omitempty"`
+	ReviewedAt        *time.Time `json:"reviewed_at,omitempty"`
+	PaymentMethod     string     `gorm:"size:16;not null;default:manual" json:"payment_method"`
+	PaidCents         int64      `gorm:"not null;default:0" json:"paid_cents"`
+	IdempotencyKey    string     `gorm:"size:128;index" json:"-"`
+	FulfilledAt       *time.Time `json:"fulfilled_at,omitempty"`
+	CreatedAt         time.Time  `gorm:"index" json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 type BalanceLedger struct {

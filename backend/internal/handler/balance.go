@@ -80,8 +80,8 @@ func CreateBalanceOrder(c *gin.Context) {
 		}
 		order = model.Order{
 			UserID: userID, PlanID: plan.ID, PlanName: plan.Name, PlanPriceCents: plan.PriceCents,
-			PlanDurationDays: plan.DurationDays, PlanRuleLimit: plan.RuleLimit, PlanUserGroupID: plan.UserGroupID,
-			Status: model.OrderStatusApproved, PaymentMethod: model.PaymentMethodBalance, PaidCents: plan.PriceCents,
+			PlanDurationDays: plan.DurationDays, PlanRuleLimit: plan.RuleLimit, PlanTrafficLimit: plan.TrafficLimit,
+			PlanUserGroupID: plan.UserGroupID, Status: model.OrderStatusApproved, PaymentMethod: model.PaymentMethodBalance, PaidCents: plan.PriceCents,
 			IdempotencyKey: key, ReviewedAt: &now, FulfilledAt: &now,
 		}
 		if err := tx.Create(&order).Error; err != nil {

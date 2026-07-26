@@ -13,7 +13,7 @@ func InitDatabase(dbPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := DB.AutoMigrate(&User{}, &UserGroup{}, &DeviceGroup{}, &Node{}, &ForwardRule{}, &RuleCategory{}, &SystemConfig{}, &ServicePlan{}, &Order{}, &BalanceLedger{}, &RechargeOrder{}, &UserNode{}, &Affiliate{}, &AffLog{}, &RedeemCode{}); err != nil {
+	if err := DB.AutoMigrate(&User{}, &UserGroup{}, &DeviceGroup{}, &Node{}, &ForwardRule{}, &RuleCategory{}, &SystemConfig{}, &ServicePlan{}, &Order{}, &BalanceLedger{}, &RechargeOrder{}, &UserNode{}, &Affiliate{}, &AffLog{}, &RedeemCode{}, &AuditLog{}); err != nil {
 		return err
 	}
 	for _, statement := range []string{

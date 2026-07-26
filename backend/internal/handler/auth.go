@@ -79,6 +79,11 @@ type ChangePwdReq struct {
 
 func ChangePassword(c *gin.Context) {
 	userID := c.GetUint("user_id")
+	clientIP := middleware.TrustedClientIP(c)
+	if !middleware.AllowLoginAttempt(c.GetString("username"), clientIP) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "操作过于频繁，请稍后再试"})
+		return
+	}
 	var req ChangePwdReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
@@ -90,6 +95,7 @@ func ChangePassword(c *gin.Context) {
 		return
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword)); err != nil {
+		middleware.RecordLoginFailure(c.GetString("username"), clientIP)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "原密码错误"})
 		return
 	}
@@ -97,6 +103,7 @@ func ChangePassword(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "新密码至少需要8个字符"})
 		return
 	}
+	middleware.RecordLoginSuccess(c.GetString("username"))
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "密码无效"})
