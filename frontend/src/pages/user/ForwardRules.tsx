@@ -9,28 +9,34 @@ import {
 } from '@ant-design/icons'
 import {
   listForwardRules, createForwardRule, updateForwardRule,
-  deleteForwardRule, toggleForwardRule, batchCreateRules, listMyDeviceGroups
+  deleteForwardRule, toggleForwardRule, batchCreateRules,
+  listCategories, createCategory, updateCategory, deleteCategory,
+  moveRulesToCategory
 } from '../../api'
 
 export default function ForwardRules() {
   const [rules, setRules] = useState<any[]>([])
-  const [deviceGroups, setDeviceGroups] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [batchModalOpen, setBatchModalOpen] = useState(false)
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<any>(null)
+  const [editingCategory, setEditingCategory] = useState<any>(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
-  const [activeGroup, setActiveGroup] = useState<string>('all')
+  const [activeCategory, setActiveCategory] = useState<string>('全部')
   const [submitting, setSubmitting] = useState(false)
+  const [categorySubmitting, setCategorySubmitting] = useState(false)
   const [form] = Form.useForm()
   const [batchForm] = Form.useForm()
+  const [categoryForm] = Form.useForm()
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [rulesRes, dgRes] = await Promise.all([listForwardRules(), listMyDeviceGroups()])
+      const [rulesRes, catRes] = await Promise.all([listForwardRules(), listCategories()])
       setRules(Array.isArray(rulesRes.data) ? rulesRes.data : rulesRes.data?.rules || [])
-      setDeviceGroups(Array.isArray(dgRes.data) ? dgRes.data : dgRes.data?.device_groups || [])
+      setCategories(Array.isArray(catRes.data) ? catRes.data : catRes.data?.categories || [])
     } catch {
       message.error('获取数据失败')
     } finally {
@@ -40,12 +46,11 @@ export default function ForwardRules() {
 
   useEffect(() => { fetchData() }, [])
 
-  const groupMap = new Map(deviceGroups.map(g => [g.id, g]))
-  const groupNames = [...new Set(rules.map(r => r.device_group_id).filter(Boolean))] as number[]
+  const catMap = new Map(categories.map(c => [c.name, c]))
 
-  const filteredRules = activeGroup === 'all'
+  const filteredRules = activeCategory === '全部'
     ? rules
-    : rules.filter(r => String(r.device_group_id) === activeGroup)
+    : rules.filter(r => r.category === activeCategory)
 
   const totalTraffic = rules.reduce((sum: number, r: any) => sum + (r.traffic || 0), 0)
 
@@ -127,7 +132,7 @@ export default function ForwardRules() {
     }
   }
 
-  const handleBatchImport = async (values: { rules_text: string; device_group_id: number }) => {
+  const handleBatchImport = async (values: { rules_text: string }) => {
     const text = values.rules_text.trim()
     let parsed: any[] = []
 
@@ -147,7 +152,7 @@ export default function ForwardRules() {
           }
           return {
             name: r.name || r.规则名 || '',
-            device_group_id: values.device_group_id,
+            category: r.category || '全部',
             listen_port: r.listen_port || r.监听端口 || 0,
             target_addr,
             target_port,
@@ -171,14 +176,14 @@ export default function ForwardRules() {
                   target_port = parseInt(parts[1], 10) || 0
                 }
               }
-              return { name: r.name || '', device_group_id: values.device_group_id, listen_port: r.listen_port || 0, target_addr, target_port: Number(target_port), protocol: String(r.protocol || 'tcp+udp').toLowerCase() }
+              return { name: r.name || '', category: r.category || '全部', listen_port: r.listen_port || 0, target_addr, target_port: Number(target_port), protocol: String(r.protocol || 'tcp+udp').toLowerCase() }
             } catch { /* fall through to line format */ }
           }
           // NY 旧格式: 名称#监听端口#目标地址#目标端口
           const parts = line.split('#')
           const [name, listen_port, target_addr, target_port] = parts
           if (parts.length !== 4) throw new Error('invalid fields')
-          return { name, device_group_id: values.device_group_id, listen_port: Number(listen_port), target_addr, target_port: Number(target_port), protocol: 'tcp+udp' }
+          return { name, category: '全部', listen_port: Number(listen_port), target_addr, target_port: Number(target_port), protocol: 'tcp+udp' }
         })
       }
     } catch {
@@ -242,15 +247,12 @@ export default function ForwardRules() {
   const columns = [
     { title: '规则名', dataIndex: 'name', key: 'name', ellipsis: true },
     {
-      title: '连接地址',
-      key: 'connection',
-      width: 220,
-      render: (_, r) => {
-        const group = groupMap.get(r.device_group_id)
-        const addr = group?.connection_addr || group?.name || `#${r.device_group_id}`
-        return `${addr}:${r.listen_port}`
-      },
+      title: '分类',
+      key: 'category',
+      width: 120,
+      render: (c: string) => <Tag color="blue">{c}</Tag>,
     },
+    { title: '监听端口', key: 'listen_port', width: 100 },
     { title: '目标地址', key: 'dest', width: 200, render: (_, r) => `${r.target_addr}:${r.target_port}` },
     {
       title: '流量', key: 'traffic', width: 120,
@@ -285,14 +287,58 @@ export default function ForwardRules() {
     },
   ]
 
-  const groupTabs = [
-    { key: 'all', label: `全部 (${rules.length})` },
-    ...groupNames.map(id => ({
-      key: String(id),
-      label: `${groupMap.get(id)?.name || `#${id}`} (${rules.filter(r => r.device_group_id === id).length})`,
+  const catTabs = [
+    { key: '全部', label: `全部 (${rules.length})` },
+    ...categories.map(c => ({
+      key: c.name,
+      label: `${c.name} (${rules.filter(r => r.category === c.name).length})`,
     })),
-    { key: 'users', label: '用户节点选择（开发中）' },
   ]
+
+  const handleCategorySubmit = async (values: any) => {
+    setCategorySubmitting(true)
+    try {
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, values)
+        message.success('修改成功')
+      } else {
+        await createCategory(values)
+        message.success('创建成功')
+      }
+      setCategoryModalOpen(false)
+      setEditingCategory(null)
+      categoryForm.resetFields()
+      fetchData()
+    } catch {
+      message.error(editingCategory ? '修改失败' : '创建失败')
+    } finally {
+      setCategorySubmitting(false)
+    }
+  }
+
+  const handleDeleteCategory = async (id: number) => {
+    try {
+      await deleteCategory(id)
+      message.success('删除成功')
+      fetchData()
+    } catch {
+      message.error('删除失败')
+    }
+  }
+
+  const handleMoveRules = async () => {
+    if (!selectedRowKeys.length) return
+    const targetCat = window.prompt('请输入目标分类名称：')
+    if (!targetCat) return
+    try {
+      await moveRulesToCategory(selectedRowKeys.map(Number), targetCat)
+      message.success('移动成功')
+      setSelectedRowKeys([])
+      fetchData()
+    } catch {
+      message.error('移动失败')
+    }
+  }
 
   return (
     <div>
@@ -325,26 +371,32 @@ export default function ForwardRules() {
             <Popconfirm title={`确定删除选中的 ${selectedRowKeys.length} 条规则?`} onConfirm={handleBatchDelete}>
               <Button danger icon={<DeleteOutlined />} disabled={!selectedRowKeys.length}>删除选中</Button>
             </Popconfirm>
+            <Button icon={<PlusOutlined />} onClick={() => { setEditingCategory(null); categoryForm.resetFields(); setCategoryModalOpen(true) }}>
+              新增分类
+            </Button>
           </Space>
         }
       >
-        <Tabs activeKey={activeGroup} onChange={setActiveGroup} items={groupTabs} style={{ marginBottom: 8 }} />
-        {activeGroup === 'users' ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#999' }}>用户节点选择功能正在开发中</div>
-        ) : (
-          <Table
-            rowKey="id"
-            columns={columns}
-            dataSource={filteredRules}
-            loading={loading}
-            rowSelection={{
-              selectedRowKeys,
-              onChange: (keys) => setSelectedRowKeys(keys),
-            }}
-            pagination={{ pageSize: 20, showSizeChanger: true, showTotal: t => `共 ${t} 条` }}
-            scroll={{ x: 800 }}
-            size="small"
-          />
+        <Tabs activeKey={activeCategory} onChange={setActiveCategory} items={catTabs} style={{ marginBottom: 8 }} />
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={filteredRules}
+          loading={loading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: (keys) => setSelectedRowKeys(keys),
+          }}
+          pagination={{ pageSize: 20, showSizeChanger: true, showTotal: t => `共 ${t} 条` }}
+          scroll={{ x: 800 }}
+          size="small"
+        />
+        {selectedRowKeys.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <Button type="link" onClick={handleMoveRules}>
+              移动选中规则到分类
+            </Button>
+          </div>
         )}
       </Card>
 
@@ -359,10 +411,11 @@ export default function ForwardRules() {
           <Form.Item name="name" label="规则名" rules={[{ required: true, message: '请输入规则名' }]}>
             <Input placeholder="规则名称" />
           </Form.Item>
-          <Form.Item name="device_group_id" label="入口设备组" rules={[{ required: true, message: '请选择设备组' }]}>
-            <Select placeholder="请选择设备组">
-              {deviceGroups.map(g => (
-                <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>
+          <Form.Item name="category" label="分类" rules={[{ required: true, message: '请选择分类' }]}>
+            <Select placeholder="请选择分类">
+              <Select.Option value="全部">全部</Select.Option>
+              {categories.map(c => (
+                <Select.Option key={c.name} value={c.name}>{c.name}</Select.Option>
               ))}
             </Select>
           </Form.Item>
@@ -375,7 +428,20 @@ export default function ForwardRules() {
             <Input.TextArea rows={3} placeholder={"例如:\n192.168.1.100:80\n10.0.0.1:443"} />
           </Form.Item>
           <Form.Item name="target_addr" hidden><Input /></Form.Item>
-          <Form.Item name="target_port" hidden><InputNumber />          </Form.Item>
+          <Form.Item name="target_port" hidden><InputNumber /></Form.Item>
+          <Form.Item name="protocol" label="协议">
+            <Select style={{ width: '100%' }}>
+              <Select.Option value="tcp">TCP</Select.Option>
+              <Select.Option value="udp">UDP</Select.Option>
+              <Select.Option value="tcp+udp">TCP+UDP</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="rate" label="倍率" extra="倍率用于流量计费，默认 1">
+            <InputNumber min={0} step={0.01} style={{ width: '100%' }} placeholder="1" />
+          </Form.Item>
+          <Form.Item name="enabled" label="启用状态" valuePropName="checked">
+            <Switch checkedChildren="启用" unCheckedChildren="停用" />
+          </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={submitting} block>
               {editingRule ? '保存修改' : '添加'}
@@ -392,13 +458,6 @@ export default function ForwardRules() {
         destroyOnClose
       >
         <Form form={batchForm} layout="vertical" onFinish={handleBatchImport}>
-          <Form.Item name="device_group_id" label="入口设备组" rules={[{ required: true, message: '请选择设备组' }]}>
-            <Select placeholder="请选择设备组">
-              {deviceGroups.map(g => (
-                <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
           <Form.Item name="rules_text" label="规则数据" rules={[{ required: true, message: '请输入规则数据' }]}
             extra="支持 NY 新旧两种格式：JSON 数组 或 每行 名称#监听端口#目标地址#目标端口"
           >
@@ -406,6 +465,28 @@ export default function ForwardRules() {
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={submitting} block>导入</Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={editingCategory ? '编辑分类' : '新建分类'}
+        open={categoryModalOpen}
+        onCancel={() => { setCategoryModalOpen(false); setEditingCategory(null) }}
+        footer={null}
+        destroyOnClose
+      >
+        <Form form={categoryForm} layout="vertical" onFinish={handleCategorySubmit}>
+          <Form.Item name="name" label="分类名" rules={[{ required: true, message: '请输入分类名' }]}>
+            <Input placeholder="分类名称" />
+          </Form.Item>
+          <Form.Item name="sort_order" label="排序">
+            <InputNumber style={{ width: '100%' }} placeholder="数值越小越靠前" />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" loading={categorySubmitting} block>
+              {editingCategory ? '保存修改' : '创建'}
+            </Button>
           </Form.Item>
         </Form>
       </Modal>

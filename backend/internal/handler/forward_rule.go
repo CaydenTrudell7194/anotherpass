@@ -19,27 +19,37 @@ const maxBatchRules = 100
 var errListenPortConflict = errors.New("listen port conflict")
 
 type forwardRuleInput struct {
-	Name          string  `json:"name"`
-	DeviceGroupID uint    `json:"device_group_id"`
-	ListenPort    int     `json:"listen_port"`
-	TargetAddr    string  `json:"target_addr"`
-	TargetPort    int     `json:"target_port"`
-	Dest          string  `json:"dest"`
-	Protocol      string  `json:"protocol"`
-	Rate          float64 `json:"rate"`
-	Enabled       *bool   `json:"enabled"`
+	Name       string  `json:"name"`
+	ListenPort int     `json:"listen_port"`
+	TargetAddr string  `json:"target_addr"`
+	TargetPort int     `json:"target_port"`
+	Dest       string  `json:"dest"`
+	Protocol   string  `json:"protocol"`
+	Rate       float64 `json:"rate"`
+	Enabled    *bool   `json:"enabled"`
+	Category   string  `json:"category"`
 }
 
 type forwardRuleUpdateInput struct {
-	Name          *string  `json:"name"`
-	DeviceGroupID *uint    `json:"device_group_id"`
-	ListenPort    *int     `json:"listen_port"`
-	TargetAddr    *string  `json:"target_addr"`
-	TargetPort    *int     `json:"target_port"`
-	Dest          *string  `json:"dest"`
-	Protocol      *string  `json:"protocol"`
-	Rate          *float64 `json:"rate"`
-	Enabled       *bool    `json:"enabled"`
+	Name       *string  `json:"name"`
+	ListenPort *int     `json:"listen_port"`
+	TargetAddr *string  `json:"target_addr"`
+	TargetPort *int     `json:"target_port"`
+	Dest       *string  `json:"dest"`
+	Protocol   *string  `json:"protocol"`
+	Rate       *float64 `json:"rate"`
+	Enabled    *bool    `json:"enabled"`
+	Category   *string  `json:"category"`
+}
+
+type categoryInput struct {
+	Name      string `json:"name" binding:"required"`
+	SortOrder int    `json:"sort_order"`
+}
+
+type categoryUpdateInput struct {
+	Name      *string `json:"name"`
+	SortOrder *int    `json:"sort_order"`
 }
 
 func parseID(c *gin.Context) (uint, bool) {
@@ -51,9 +61,16 @@ func parseID(c *gin.Context) (uint, bool) {
 	return uint(id), true
 }
 
+func parseCategoryID(c *gin.Context) (uint, bool) {
+	id, err := strconv.ParseUint(c.Param("cid"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "分类ID无效"})
+		return 0, false
+	}
+	return uint(id), true
+}
+
 func parseDest(dest string) (addr string, port int) {
-	// 当前 ForwardRule schema 仅支持单一目标地址,因此只取 dest 中第一行有效的 addr:port。
-	// 多行 dest 仅作格式容错,后续行会被忽略;未来如需多目标支持,在此扩展解析逻辑。
 	lines := strings.Split(strings.TrimSpace(dest), "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -89,9 +106,6 @@ func validateForwardRule(input *forwardRuleInput) string {
 	if input.Name == "" || len(input.Name) > 128 {
 		return "规则名称不能为空且不能超过128个字符"
 	}
-	if input.DeviceGroupID == 0 {
-		return "设备组无效"
-	}
 	if input.ListenPort < 1 || input.ListenPort > 65535 || input.TargetPort < 1 || input.TargetPort > 65535 {
 		return "端口必须在1到65535之间"
 	}
@@ -104,34 +118,10 @@ func validateForwardRule(input *forwardRuleInput) string {
 	if math.IsNaN(input.Rate) || math.IsInf(input.Rate, 0) || input.Rate < 0 {
 		return "倍率无效"
 	}
+	if input.Category != "" && len(input.Category) > 64 {
+		return "分类名称不能超过64个字符"
+	}
 	return ""
-}
-
-func authorizeDeviceGroup(userID, groupID uint, isAdmin bool) error {
-	var group model.DeviceGroup
-	if err := model.DB.First(&group, groupID).Error; err != nil {
-		return err
-	}
-	if isAdmin {
-		return nil
-	}
-	if group.Type != model.DeviceGroupEntryForceDirect && group.Type != model.DeviceGroupEntryOptionalDirect {
-		return gorm.ErrRecordNotFound
-	}
-	var user model.User
-	if err := model.DB.First(&user, userID).Error; err != nil {
-		return err
-	}
-	if group.UserGroupIDs == "" {
-		return nil
-	}
-	wanted := strconv.FormatUint(uint64(user.UserGroupID), 10)
-	for _, id := range strings.Split(group.UserGroupIDs, ",") {
-		if strings.TrimSpace(id) == wanted {
-			return nil
-		}
-	}
-	return gorm.ErrRecordNotFound
 }
 
 func checkRuleLimit(db *gorm.DB, userID uint, additional int) error {
@@ -152,8 +142,8 @@ func checkRuleLimit(db *gorm.DB, userID uint, additional int) error {
 	return nil
 }
 
-func checkListenPortConflict(db *gorm.DB, groupID uint, protocol string, listenPort int, excludeID uint) error {
-	q := db.Model(&model.ForwardRule{}).Where("device_group_id = ? AND protocol = ? AND listen_port = ? AND enabled = ?", groupID, protocol, listenPort, true)
+func checkListenPortConflict(db *gorm.DB, userID uint, protocol string, listenPort int, excludeID uint) error {
+	q := db.Model(&model.ForwardRule{}).Where("user_id = ? AND protocol = ? AND listen_port = ? AND enabled = ?", userID, protocol, listenPort, true)
 	if excludeID != 0 {
 		q = q.Where("id <> ?", excludeID)
 	}
@@ -172,11 +162,23 @@ func inputToRule(input forwardRuleInput, userID uint, now time.Time) model.Forwa
 	if input.Enabled != nil {
 		enabled = *input.Enabled
 	}
+	category := input.Category
+	if category == "" {
+		category = "全部"
+	}
 	return model.ForwardRule{
-		UserID: userID, Name: input.Name, DeviceGroupID: input.DeviceGroupID,
-		ListenPort: input.ListenPort, TargetAddr: input.TargetAddr, TargetPort: input.TargetPort,
-		Protocol: input.Protocol, Rate: input.Rate, Enabled: enabled, Status: "active",
-		CreatedAt: now, UpdatedAt: now,
+		UserID:     userID,
+		Name:       input.Name,
+		ListenPort: input.ListenPort,
+		TargetAddr: input.TargetAddr,
+		TargetPort: input.TargetPort,
+		Protocol:   input.Protocol,
+		Rate:       input.Rate,
+		Enabled:    enabled,
+		Category:   category,
+		Status:     "active",
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 }
 
@@ -194,6 +196,118 @@ func ListForwardRules(c *gin.Context) {
 	c.JSON(http.StatusOK, rules)
 }
 
+func ListCategories(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	var cats []model.RuleCategory
+	model.DB.Where("user_id = ?", userID).Order("sort_order asc, id asc").Find(&cats)
+	hasAll := false
+	for _, c := range cats {
+		if c.Name == "全部" {
+			hasAll = true
+			break
+		}
+	}
+	if !hasAll {
+		cats = append([]model.RuleCategory{{Name: "全部", SortOrder: -1}}, cats...)
+	}
+	c.JSON(http.StatusOK, cats)
+}
+
+func CreateCategory(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	var input categoryInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+	input.Name = strings.TrimSpace(input.Name)
+	if input.Name == "" || len(input.Name) > 64 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "分类名称不能为空且不能超过64个字符"})
+		return
+	}
+	if input.Name == "全部" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "不能创建名为'全部'的分类"})
+		return
+	}
+	var count int64
+	model.DB.Model(&model.RuleCategory{}).Where("user_id = ? AND name = ?", userID, input.Name).Count(&count)
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "分类名称已存在"})
+		return
+	}
+	cat := model.RuleCategory{UserID: userID, Name: input.Name, SortOrder: input.SortOrder}
+	if err := model.DB.Create(&cat).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建失败"})
+		return
+	}
+	c.JSON(http.StatusOK, cat)
+}
+
+func UpdateCategory(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	id, ok := parseCategoryID(c)
+	if !ok {
+		return
+	}
+	var cat model.RuleCategory
+	if err := model.DB.Where("id = ? AND user_id = ?", id, userID).First(&cat).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "分类不存在"})
+		return
+	}
+	if cat.Name == "全部" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "不能修改'全部'分类"})
+		return
+	}
+	var input categoryUpdateInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+	if input.Name != nil {
+		name := strings.TrimSpace(*input.Name)
+		if name == "" || len(name) > 64 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "分类名称不能为空且不能超过64个字符"})
+			return
+		}
+		if name == "全部" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "不能使用'全部'作为分类名称"})
+			return
+		}
+		var count int64
+		model.DB.Model(&model.RuleCategory{}).Where("user_id = ? AND name = ? AND id <> ?", userID, name, id).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "分类名称已存在"})
+			return
+		}
+		cat.Name = name
+	}
+	if input.SortOrder != nil {
+		cat.SortOrder = *input.SortOrder
+	}
+	model.DB.Save(&cat)
+	c.JSON(http.StatusOK, cat)
+}
+
+func DeleteCategory(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	id, ok := parseCategoryID(c)
+	if !ok {
+		return
+	}
+	var cat model.RuleCategory
+	if err := model.DB.Where("id = ? AND user_id = ?", id, userID).First(&cat).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "分类不存在"})
+		return
+	}
+	if cat.Name == "全部" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "不能删除'全部'分类"})
+		return
+	}
+	model.DB.Model(&model.ForwardRule{}).Where("user_id = ? AND category = ?", userID, cat.Name).Update("category", "全部")
+	model.DB.Delete(&cat)
+	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
+}
+
 func CreateForwardRule(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	var input forwardRuleInput
@@ -205,17 +319,13 @@ func CreateForwardRule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": msg})
 		return
 	}
-	if err := authorizeDeviceGroup(userID, input.DeviceGroupID, c.GetBool("is_admin")); err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "无权使用该设备组"})
-		return
-	}
 	rule := inputToRule(input, userID, time.Now())
 	err := model.DB.Transaction(func(tx *gorm.DB) error {
 		if err := checkRuleLimit(tx, userID, 1); err != nil {
 			return err
 		}
 		if rule.Enabled {
-			if err := checkListenPortConflict(tx, rule.DeviceGroupID, rule.Protocol, rule.ListenPort, 0); err != nil {
+			if err := checkListenPortConflict(tx, userID, rule.Protocol, rule.ListenPort, 0); err != nil {
 				return err
 			}
 		}
@@ -227,7 +337,7 @@ func CreateForwardRule(c *gin.Context) {
 			return
 		}
 		if err == errListenPortConflict {
-			c.JSON(http.StatusConflict, gin.H{"error": "该设备组的监听端口已被占用"})
+			c.JSON(http.StatusConflict, gin.H{"error": "该用户的监听端口已被占用"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建失败"})
@@ -257,13 +367,18 @@ func UpdateForwardRule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
 	}
-	input := forwardRuleInput{Name: rule.Name, DeviceGroupID: rule.DeviceGroupID, ListenPort: rule.ListenPort,
-		TargetAddr: rule.TargetAddr, TargetPort: rule.TargetPort, Protocol: rule.Protocol, Rate: rule.Rate, Enabled: &rule.Enabled}
+	input := forwardRuleInput{
+		Name:       rule.Name,
+		ListenPort: rule.ListenPort,
+		TargetAddr: rule.TargetAddr,
+		TargetPort: rule.TargetPort,
+		Protocol:   rule.Protocol,
+		Rate:       rule.Rate,
+		Enabled:    &rule.Enabled,
+		Category:   rule.Category,
+	}
 	if patch.Name != nil {
 		input.Name = *patch.Name
-	}
-	if patch.DeviceGroupID != nil {
-		input.DeviceGroupID = *patch.DeviceGroupID
 	}
 	if patch.ListenPort != nil {
 		input.ListenPort = *patch.ListenPort
@@ -291,12 +406,11 @@ func UpdateForwardRule(c *gin.Context) {
 	if patch.Enabled != nil {
 		input.Enabled = patch.Enabled
 	}
+	if patch.Category != nil {
+		input.Category = *patch.Category
+	}
 	if msg := validateForwardRule(&input); msg != "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": msg})
-		return
-	}
-	if err := authorizeDeviceGroup(userID, input.DeviceGroupID, isAdmin); err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "无权使用该设备组"})
 		return
 	}
 	updated := inputToRule(input, rule.UserID, rule.CreatedAt)
@@ -306,7 +420,7 @@ func UpdateForwardRule(c *gin.Context) {
 	updated.UpdatedAt = time.Now()
 	err := model.DB.Transaction(func(tx *gorm.DB) error {
 		if updated.Enabled {
-			if err := checkListenPortConflict(tx, updated.DeviceGroupID, updated.Protocol, updated.ListenPort, updated.ID); err != nil {
+			if err := checkListenPortConflict(tx, updated.UserID, updated.Protocol, updated.ListenPort, updated.ID); err != nil {
 				return err
 			}
 		}
@@ -314,7 +428,7 @@ func UpdateForwardRule(c *gin.Context) {
 	})
 	if err != nil {
 		if err == errListenPortConflict {
-			c.JSON(http.StatusConflict, gin.H{"error": "该设备组的监听端口已被占用"})
+			c.JSON(http.StatusConflict, gin.H{"error": "该用户的监听端口已被占用"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败"})
@@ -361,7 +475,7 @@ func ToggleForwardRule(c *gin.Context) {
 	rule.Enabled = !rule.Enabled
 	err := model.DB.Transaction(func(tx *gorm.DB) error {
 		if rule.Enabled {
-			if err := checkListenPortConflict(tx, rule.DeviceGroupID, rule.Protocol, rule.ListenPort, rule.ID); err != nil {
+			if err := checkListenPortConflict(tx, rule.UserID, rule.Protocol, rule.ListenPort, rule.ID); err != nil {
 				return err
 			}
 		}
@@ -369,7 +483,7 @@ func ToggleForwardRule(c *gin.Context) {
 	})
 	if err != nil {
 		if err == errListenPortConflict {
-			c.JSON(http.StatusConflict, gin.H{"error": "该设备组的监听端口已被占用"})
+			c.JSON(http.StatusConflict, gin.H{"error": "该用户的监听端口已被占用"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败"})
@@ -396,10 +510,6 @@ func BatchCreateForwardRules(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "第" + strconv.Itoa(i+1) + "条规则: " + msg})
 			return
 		}
-		if err := authorizeDeviceGroup(userID, inputs[i].DeviceGroupID, c.GetBool("is_admin")); err != nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "第" + strconv.Itoa(i+1) + "条规则无权使用该设备组"})
-			return
-		}
 		rules = append(rules, inputToRule(inputs[i], userID, now))
 	}
 	err := model.DB.Transaction(func(tx *gorm.DB) error {
@@ -411,12 +521,12 @@ func BatchCreateForwardRules(c *gin.Context) {
 			if !rule.Enabled {
 				continue
 			}
-			key := strconv.FormatUint(uint64(rule.DeviceGroupID), 10) + ":" + rule.Protocol + ":" + strconv.Itoa(rule.ListenPort)
+			key := strconv.FormatUint(uint64(rule.UserID), 10) + ":" + rule.Protocol + ":" + strconv.Itoa(rule.ListenPort)
 			if _, exists := seen[key]; exists {
 				return errListenPortConflict
 			}
 			seen[key] = struct{}{}
-			if err := checkListenPortConflict(tx, rule.DeviceGroupID, rule.Protocol, rule.ListenPort, 0); err != nil {
+			if err := checkListenPortConflict(tx, rule.UserID, rule.Protocol, rule.ListenPort, 0); err != nil {
 				return err
 			}
 		}
@@ -435,4 +545,25 @@ func BatchCreateForwardRules(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, rules)
+}
+
+func MoveRulesToCategory(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	var input struct {
+		RuleIDs  []uint `json:"rule_ids" binding:"required"`
+		Category string `json:"category" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil || len(input.RuleIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+	if len(input.Category) > 64 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "分类名称不能超过64个字符"})
+		return
+	}
+	if err := model.DB.Model(&model.ForwardRule{}).Where("id IN ? AND user_id = ?", input.RuleIDs, userID).Update("category", input.Category).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "移动失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "移动成功"})
 }

@@ -6,6 +6,8 @@ import { adminListAffiliates, adminUpdateAffiliate } from '../../api'
 interface AffiliateRecord {
   id: number
   user_id: number
+  username: string
+  display_name: string
   code: string
   commission_rate: number
   total_earned_cents: number
@@ -44,7 +46,8 @@ const Affiliates: React.FC = () => {
   }
 
   const columns = [
-    { title: '用户 ID', dataIndex: 'user_id', key: 'user_id' },
+    { title: '用户', dataIndex: 'username', key: 'username' },
+    { title: '显示名', dataIndex: 'display_name', key: 'display_name' },
     { title: '推广码', dataIndex: 'code', key: 'code' },
     {
       title: '佣金比例', dataIndex: 'commission_rate', key: 'commission_rate',

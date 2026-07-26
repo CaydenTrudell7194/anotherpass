@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Card, Row, Col, Statistic, Spin, message, Typography, Input } from 'antd'
-import { CopyOutlined, DollarOutlined, PercentageOutlined, GiftOutlined } from '@ant-design/icons'
+import { CopyOutlined, DollarOutlined, PercentageOutlined, GiftOutlined, UserOutlined } from '@ant-design/icons'
 import { getAffiliateInfo } from '../../api'
 
 const { Text } = Typography
@@ -9,6 +9,7 @@ interface AffiliateInfo {
   code: string
   total_earned_cents: number
   commission_rate: number
+  referral_count: number
 }
 
 const Affiliate: React.FC = () => {
@@ -57,6 +58,11 @@ const Affiliate: React.FC = () => {
               <Col span={12}>
                 <Card>
                   <Statistic title="佣金比例" value={info.commission_rate * 100} suffix="%" prefix={<PercentageOutlined />} />
+                </Card>
+              </Col>
+              <Col span={12}>
+                <Card>
+                  <Statistic title="推广人数" value={info.referral_count} prefix={<UserOutlined />} />
                 </Card>
               </Col>
             </Row>

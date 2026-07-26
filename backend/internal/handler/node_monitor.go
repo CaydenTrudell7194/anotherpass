@@ -153,6 +153,9 @@ func loadMonitorScope(allowed map[uint]bool, userID uint, isAdmin bool) ([]model
 	}
 	if isAdmin {
 		model.DB.Order("id asc").Find(&userNodes)
+	} else {
+		// 普通用户只能看到自己的用户节点
+		model.DB.Where("user_id = ?", userID).Find(&userNodes)
 	}
 	return groups, nodes, userNodes
 }

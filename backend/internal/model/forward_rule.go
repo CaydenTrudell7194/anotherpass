@@ -15,6 +15,16 @@ type ForwardRule struct {
 	Traffic       int64     `gorm:"default:0" json:"traffic"`
 	Rate          float64   `gorm:"default:1" json:"rate"`
 	Enabled       bool      `gorm:"default:true" json:"enabled"`
+	Category      string    `gorm:"size:64;index" json:"category"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type RuleCategory struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	UserID    uint      `gorm:"index" json:"user_id"`
+	Name      string    `gorm:"size:64;not null" json:"name"`
+	SortOrder int       `gorm:"default:0" json:"sort_order"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }

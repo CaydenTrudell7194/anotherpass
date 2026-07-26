@@ -26,7 +26,9 @@ func GetAffiliateInfo(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "创建推广信息失败"})
 			return
 		}
-		aff = model.Affiliate{UserID: userID, Code: code}
+		// 使用站点默认佣金比例
+		settings := LoadSiteSettings()
+		aff = model.Affiliate{UserID: userID, Code: code, CommissionRate: settings.DefaultCommissionRate}
 		if err := model.DB.Create(&aff).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "创建推广信息失败"})
 			return
@@ -43,7 +45,31 @@ func GetAffiliateInfo(c *gin.Context) {
 func AdminListAffiliates(c *gin.Context) {
 	var affs []model.Affiliate
 	model.DB.Order("id desc").Limit(100).Find(&affs)
-	c.JSON(http.StatusOK, affs)
+	if len(affs) == 0 {
+		c.JSON(http.StatusOK, []interface{}{})
+		return
+	}
+	userIDs := make([]uint, len(affs))
+	for i, a := range affs {
+		userIDs[i] = a.UserID
+	}
+	var users []model.User
+	model.DB.Where("id IN ?", userIDs).Find(&users)
+	userMap := make(map[uint]model.User, len(users))
+	for _, u := range users {
+		userMap[u.ID] = u
+	}
+	type AffiliateWithUser struct {
+		model.Affiliate
+		Username    string `json:"username"`
+		DisplayName string `json:"display_name"`
+	}
+	result := make([]AffiliateWithUser, len(affs))
+	for i, a := range affs {
+		u := userMap[a.UserID]
+		result[i] = AffiliateWithUser{Affiliate: a, Username: u.Username, DisplayName: u.DisplayName}
+	}
+	c.JSON(http.StatusOK, result)
 }
 
 func AdminUpdateAffiliate(c *gin.Context) {

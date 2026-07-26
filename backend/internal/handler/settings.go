@@ -18,27 +18,28 @@ import (
 const siteSettingsKey = "site_settings"
 
 type SiteSettings struct {
-	SiteName                  string `json:"site_name"`
-	SiteSubtitle              string `json:"site_subtitle"`
-	SiteNotice                string `json:"site_notice"`
-	AllowRegister             bool   `json:"allow_register"`
-	RegisterUserGroupID       uint   `json:"register_user_group_id"`
-	RegisterRuleLimit         int    `json:"register_rule_limit"`
-	RegisterExpireDays        int    `json:"register_expire_days"`
-	ThemePolicy               string `json:"theme_policy"`
-	BackgroundURL             string `json:"background_url"`
-	MobileBackgroundURL       string `json:"mobile_background_url"`
-	OfflineNodeSeconds        int    `json:"offline_node_seconds"`
-	OfflineNodeRetentionHours int    `json:"offline_node_retention_hours"`
-	TelegramEnabled           bool   `json:"telegram_enabled"`
-	TelegramChatID            string `json:"telegram_chat_id"`
-	TelegramBotToken          string `json:"telegram_bot_token"`
-	TelegramBotConfigured     bool   `json:"telegram_bot_configured" gorm:"-"`
-	EpayGateway               string `json:"epay_gateway"`
-	EpayPid                   string `json:"epay_pid"`
-	CodepayCreateUrl          string `json:"codepay_create_url"`
-	CodepayMerchantId         string `json:"codepay_merchant_id"`
-	AllowUserNodes            bool   `json:"allow_user_nodes"`
+	SiteName                  string  `json:"site_name"`
+	SiteSubtitle              string  `json:"site_subtitle"`
+	SiteNotice                string  `json:"site_notice"`
+	AllowRegister             bool    `json:"allow_register"`
+	RegisterUserGroupID       uint    `json:"register_user_group_id"`
+	RegisterRuleLimit         int     `json:"register_rule_limit"`
+	RegisterExpireDays        int     `json:"register_expire_days"`
+	ThemePolicy               string  `json:"theme_policy"`
+	BackgroundURL             string  `json:"background_url"`
+	MobileBackgroundURL       string  `json:"mobile_background_url"`
+	OfflineNodeSeconds        int     `json:"offline_node_seconds"`
+	OfflineNodeRetentionHours int     `json:"offline_node_retention_hours"`
+	TelegramEnabled           bool    `json:"telegram_enabled"`
+	TelegramChatID            string  `json:"telegram_chat_id"`
+	TelegramBotToken          string  `json:"telegram_bot_token"`
+	TelegramBotConfigured     bool    `json:"telegram_bot_configured" gorm:"-"`
+	EpayGateway               string  `json:"epay_gateway"`
+	EpayPid                   string  `json:"epay_pid"`
+	CodepayCreateUrl          string  `json:"codepay_create_url"`
+	CodepayMerchantId         string  `json:"codepay_merchant_id"`
+	AllowUserNodes            bool    `json:"allow_user_nodes"`
+	DefaultCommissionRate     float64 `json:"default_commission_rate"`
 }
 
 type PublicSiteInfo struct {
@@ -64,7 +65,9 @@ func DefaultSiteSettings() SiteSettings {
 		SiteName: "转发面板", SiteSubtitle: "入口直出转发管理平台",
 		RegisterUserGroupID: 1, RegisterRuleLimit: 100, RegisterExpireDays: 365,
 		ThemePolicy: "classic", OfflineNodeSeconds: 90, OfflineNodeRetentionHours: 24,
+		DefaultCommissionRate: 0.1,
 	}
+}
 }
 
 func LoadSiteSettings() SiteSettings {
@@ -118,6 +121,12 @@ func normalizeSiteSettings(settings *SiteSettings) {
 	if settings.OfflineNodeRetentionHours > 8760 {
 		settings.OfflineNodeRetentionHours = 8760
 	}
+	if settings.DefaultCommissionRate < 0 {
+		settings.DefaultCommissionRate = 0
+	}
+	if settings.DefaultCommissionRate > 1 {
+		settings.DefaultCommissionRate = 1
+	}
 }
 
 func validateSiteSettings(settings *SiteSettings) string {
@@ -136,6 +145,9 @@ func validateSiteSettings(settings *SiteSettings) string {
 	}
 	if settings.TelegramEnabled && (settings.TelegramChatID == "" || len(settings.TelegramChatID) > 64 || (telegramBotToken() == "" && settings.TelegramBotToken == "")) {
 		return "Telegram Bot Token 未配置或 Chat ID 无效"
+	}
+	if settings.DefaultCommissionRate < 0 || settings.DefaultCommissionRate > 1 {
+		return "默认佣金比例必须在 0-1 之间"
 	}
 	var group model.UserGroup
 	if err := model.DB.First(&group, settings.RegisterUserGroupID).Error; err != nil {
@@ -189,6 +201,7 @@ func UpdateSiteSettings(c *gin.Context) {
 	settings.EpayPid = incoming.EpayPid
 	settings.CodepayCreateUrl = incoming.CodepayCreateUrl
 	settings.CodepayMerchantId = incoming.CodepayMerchantId
+	settings.DefaultCommissionRate = incoming.DefaultCommissionRate
 
 	if incoming.TelegramBotToken == "" || incoming.TelegramBotToken == "****" {
 		settings.TelegramBotToken = oldToken

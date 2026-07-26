@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -92,10 +93,17 @@ func deriveOrigin(rawURL string) string {
 func checkWebSocketOrigin(r *http.Request) bool {
 	origin := strings.TrimSpace(r.Header.Get("Origin"))
 	if origin == "" {
-		return true
+		return true // 节点客户端通常不发送 Origin，直接放行
 	}
+	// 同源检查：允许同源 Origin，以及配置的额外 Origin
 	for allowed := range allowedWSOrigins() {
 		if origin == allowed {
+			return true
+		}
+	}
+	// 兜底：同源请求也放行（同协议+同域名+同端口）
+	if u, err := url.Parse(origin); err == nil {
+		if u.Host == r.Host {
 			return true
 		}
 	}

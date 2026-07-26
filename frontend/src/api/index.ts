@@ -40,6 +40,13 @@ export const updateForwardRule = (id: number, data: any) => api.put(`/forward_ru
 export const deleteForwardRule = (id: number) => api.delete(`/forward_rules/${id}`)
 export const toggleForwardRule = (id: number) => api.put(`/forward_rules/${id}/toggle`)
 export const batchCreateRules = (rules: any[]) => api.post('/forward_rules/batch', rules)
+export const moveRulesToCategory = (ruleIds: number[], category: string) => api.post('/forward_rules/move', { rule_ids: ruleIds, category })
+
+// Category APIs
+export const listCategories = () => api.get('/forward_rules/categories')
+export const createCategory = (data: any) => api.post('/forward_rules/categories', data)
+export const updateCategory = (cid: number, data: any) => api.put(`/forward_rules/categories/${cid}`, data)
+export const deleteCategory = (cid: number) => api.delete(`/forward_rules/categories/${cid}`)
 
 export const adminDashboard = () => api.get('/admin/dashboard')
 export const getAdminSettings = () => api.get('/admin/settings')
