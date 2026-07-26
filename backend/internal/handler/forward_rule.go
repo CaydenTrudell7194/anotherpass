@@ -690,3 +690,4 @@ func DiagnoseForwardRule(c *gin.Context) {
 	}
 	conn.Close()
 	c.JSON(http.StatusOK, gin.H{"reachable": true})
+}
