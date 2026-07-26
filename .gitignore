@@ -26,6 +26,8 @@ jobs*.json
 # OS
 .DS_Store
 Thumbs.db
+backend/cmd.exe
+*.exe
 
 # Env
 .env

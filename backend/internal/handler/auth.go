@@ -23,12 +23,19 @@ func Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
 	}
+	clientIP := middleware.TrustedClientIP(c)
+	if !middleware.AllowLoginAttempt(req.Username, clientIP) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "登录尝试过于频繁，请稍后再试"})
+		return
+	}
 	var user model.User
 	if err := model.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
+		middleware.RecordLoginFailure(req.Username, clientIP)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
 		return
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		middleware.RecordLoginFailure(req.Username, clientIP)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
 		return
 	}
@@ -40,6 +47,7 @@ func Login(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "账户已过期"})
 		return
 	}
+	middleware.RecordLoginSuccess(req.Username)
 	claims := &middleware.Claims{
 		UserID:       user.ID,
 		Username:     user.Username,

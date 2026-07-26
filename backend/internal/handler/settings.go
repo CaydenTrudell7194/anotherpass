@@ -2,12 +2,12 @@ package handler
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"forward-panel/internal/middleware"
 	"forward-panel/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -302,14 +302,5 @@ func allowRegistrationAttempt(ip string) bool {
 }
 
 func registrationClientIP(c *gin.Context) string {
-	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
-	if err != nil {
-		host = c.Request.RemoteAddr
-	}
-	if host == "127.0.0.1" || host == "::1" {
-		if forwarded := strings.TrimSpace(c.GetHeader("X-Real-IP")); net.ParseIP(forwarded) != nil {
-			return forwarded
-		}
-	}
-	return host
+	return middleware.TrustedClientIP(c)
 }

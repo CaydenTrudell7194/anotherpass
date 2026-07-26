@@ -15,20 +15,29 @@ import (
 	"gorm.io/gorm"
 )
 
+var errRedeemInvalid = errors.New("redeem code invalid or unavailable")
+
 func GetAffiliateInfo(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	var aff model.Affiliate
 	if err := model.DB.Where("user_id = ?", userID).First(&aff).Error; err != nil {
-		code := randomAffCode(8)
+		code, codeErr := uniqueAffCode(8)
+		if codeErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "创建推广信息失败"})
+			return
+		}
 		aff = model.Affiliate{UserID: userID, Code: code}
 		if err := model.DB.Create(&aff).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "创建推广信息失败"})
 			return
 		}
 	}
-	var count int64
-	model.DB.Model(&model.User{}).Where("id IN (SELECT user_id FROM affiliates WHERE code != '' AND ? LIKE CONCAT('%', code, '%'))", "").Count(&count)
-	c.JSON(http.StatusOK, gin.H{"code": aff.Code, "commission_rate": aff.CommissionRate, "total_earned_cents": aff.TotalEarnedCents, "referral_count": 0})
+	var referralCount int64
+	if err := model.DB.Model(&model.AffLog{}).Where("referrer_id = ?", userID).Count(&referralCount).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询推广统计失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": aff.Code, "commission_rate": aff.CommissionRate, "total_earned_cents": aff.TotalEarnedCents, "referral_count": referralCount})
 }
 
 func AdminListAffiliates(c *gin.Context) {
@@ -44,8 +53,8 @@ func AdminUpdateAffiliate(c *gin.Context) {
 		return
 	}
 	var input struct {
-		CommissionRate   *float64 `json:"commission_rate"`
-		TotalEarnedCents *int64   `json:"total_earned_cents"`
+		CommissionRate          *float64 `json:"commission_rate"`
+		CommissionRatePercent   *float64 `json:"commission_rate_percent"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
@@ -58,13 +67,12 @@ func AdminUpdateAffiliate(c *gin.Context) {
 			return
 		}
 		updates["commission_rate"] = *input.CommissionRate
-	}
-	if input.TotalEarnedCents != nil {
-		if *input.TotalEarnedCents < 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "累计收益不能为负数"})
+	} else if input.CommissionRatePercent != nil {
+		if *input.CommissionRatePercent < 0 || *input.CommissionRatePercent > 100 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "佣金比例必须在 0-100 之间"})
 			return
 		}
-		updates["total_earned_cents"] = *input.TotalEarnedCents
+		updates["commission_rate"] = *input.CommissionRatePercent / 100.0
 	}
 	if len(updates) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "没有需要更新的字段"})
@@ -92,21 +100,24 @@ func RedeemCodeHandler(c *gin.Context) {
 	var code model.RedeemCode
 	err := model.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("code = ?", input.Code).First(&code).Error; err != nil {
-			return err
+			return errRedeemInvalid
+		}
+		if code.AmountCents < 100 || code.AmountCents > maxBalanceAmount {
+			return errRedeemInvalid
 		}
 		if code.ExpiresAt != nil && code.ExpiresAt.Before(time.Now()) {
-			return errors.New("兑换码已过期")
+			return errRedeemInvalid
 		}
 		if code.MaxUses > 0 {
 			if code.UsedCount >= code.MaxUses {
-				return errors.New("兑换码已达使用上限")
+				return errRedeemInvalid
 			}
 			result := tx.Model(&model.RedeemCode{}).Where("id = ? AND used_count = ?", code.ID, code.UsedCount).Update("used_count", code.UsedCount+1)
 			if result.Error != nil {
 				return result.Error
 			}
 			if result.RowsAffected != 1 {
-				return errors.New("兑换码并发冲突")
+				return errRedeemInvalid
 			}
 		}
 		var existing int64
@@ -114,7 +125,7 @@ func RedeemCodeHandler(c *gin.Context) {
 			return err
 		}
 		if existing > 0 {
-			return errors.New("该兑换码已使用")
+			return errRedeemInvalid
 		}
 		result := tx.Model(&model.User{}).Where("id = ? AND balance_cents <= ?", userID, int64(^uint64(0)>>1)-code.AmountCents).UpdateColumn("balance_cents", gorm.Expr("balance_cents + ?", code.AmountCents))
 		if result.Error != nil || result.RowsAffected != 1 {
@@ -132,11 +143,11 @@ func RedeemCodeHandler(c *gin.Context) {
 		return tx.Create(&ledger).Error
 	})
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "兑换码不存在"})
+		if errors.Is(err, errRedeemInvalid) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "兑换码无效或不可用"})
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "兑换失败"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "兑换成功", "amount_cents": code.AmountCents})
@@ -148,7 +159,7 @@ func AdminCreateRedeemCodes(c *gin.Context) {
 		AmountCents int64 `json:"amount_cents"`
 		MaxUses     int   `json:"max_uses"`
 	}
-	if err := c.ShouldBindJSON(&input); err != nil || input.Count < 1 || input.Count > 1000 || input.AmountCents < 100 || input.MaxUses < 1 {
+	if err := c.ShouldBindJSON(&input); err != nil || input.Count < 1 || input.Count > 1000 || input.AmountCents < 100 || input.AmountCents > maxBalanceAmount || input.MaxUses < 1 || input.MaxUses > 100000 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
 	}
@@ -193,4 +204,18 @@ func randomAffCode(length int) string {
 		b[i] = chars[int(b[i])%len(chars)]
 	}
 	return string(b)
+}
+
+func uniqueAffCode(length int) (string, error) {
+	for attempt := 0; attempt < 5; attempt++ {
+		code := randomAffCode(length)
+		var existing int64
+		if err := model.DB.Model(&model.Affiliate{}).Where("code = ?", code).Count(&existing).Error; err != nil {
+			return "", err
+		}
+		if existing == 0 {
+			return code, nil
+		}
+	}
+	return "", errors.New("could not allocate unique affiliate code")
 }

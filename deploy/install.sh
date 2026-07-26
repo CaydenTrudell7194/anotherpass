@@ -102,10 +102,8 @@ if [ -f panel.env ]; then
 elif [ "$LEGACY_UPGRADE" = "y" ]; then
   echo "检测到旧版数据库，将保留原管理员密码并生成新的 JWT 密钥"
   ADMIN_PWD=""
-  BOOTSTRAP_PWD=$(openssl rand -hex 16 2>/dev/null || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
   JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
   cat > panel.env << ENVEOF
-ADMIN_PASSWORD=${BOOTSTRAP_PWD}
 JWT_SECRET=${JWT_SECRET}
 DATABASE=sqlite3:///data/data.db
 TELEGRAM_BOT_TOKEN=${TELEGRAM_TOKEN}

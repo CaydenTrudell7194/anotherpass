@@ -2,12 +2,13 @@ package handler
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"forward-panel/internal/middleware"
 	"forward-panel/internal/model"
 
 	"github.com/gin-gonic/gin"
@@ -57,7 +58,48 @@ type nodeMetrics struct {
 var nodeUpgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
-	CheckOrigin:     func(r *http.Request) bool { return true },
+	CheckOrigin:     checkWebSocketOrigin,
+}
+
+// allowedWSOrigins 返回允许建立 WebSocket 的浏览器 origin 集合。
+// 默认从 PUBLIC_URL 推导同源,可以通过 WS_ALLOWED_ORIGINS 环境变量额外追加以逗号分隔的 origin。
+// 节点客户端(nodeclient)通常不发送 Origin header,一律放行,避免误伤真实节点流量。
+func allowedWSOrigins() map[string]bool {
+	origins := make(map[string]bool)
+	for _, raw := range strings.Split(os.Getenv("WS_ALLOWED_ORIGINS"), ",") {
+		if v := strings.TrimSpace(raw); v != "" {
+			origins[v] = true
+		}
+	}
+	if pub := strings.TrimSpace(os.Getenv("PUBLIC_URL")); pub != "" {
+		origins[deriveOrigin(pub)] = true
+	}
+	return origins
+}
+
+func deriveOrigin(rawURL string) string {
+	if i := strings.Index(rawURL, "://"); i > 0 {
+		rest := rawURL[i+3:]
+		if j := strings.IndexAny(rest, "/?#"); j >= 0 {
+			rest = rest[:j]
+		}
+		return rawURL[:i+3] + rest
+	}
+	return rawURL
+}
+
+// checkWebSocketOrigin 仅允许同源浏览器与节点客户端(空 Origin)连接。
+func checkWebSocketOrigin(r *http.Request) bool {
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		return true
+	}
+	for allowed := range allowedWSOrigins() {
+		if origin == allowed {
+			return true
+		}
+	}
+	return false
 }
 
 type nodeSession struct {
@@ -222,15 +264,7 @@ func userNodeWebSocket(c *gin.Context, clientIP string, token string, userNode *
 }
 
 func realClientIP(c *gin.Context) string {
-	if ip := strings.TrimSpace(c.GetHeader("X-Real-IP")); ip != "" && net.ParseIP(ip) != nil {
-		return ip
-	}
-	if fwd := strings.TrimSpace(c.GetHeader("X-Forwarded-For")); fwd != "" {
-		if ip := strings.Split(fwd, ",")[0]; net.ParseIP(strings.TrimSpace(ip)) != nil {
-			return strings.TrimSpace(ip)
-		}
-	}
-	return c.ClientIP()
+	return middleware.TrustedClientIP(c)
 }
 
 func NodeWebSocket(c *gin.Context) {

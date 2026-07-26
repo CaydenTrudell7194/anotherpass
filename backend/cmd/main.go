@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"forward-panel/internal/config"
@@ -16,6 +18,31 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// websocketConnectSrc 返回 CSP connect-src 中允许的 WebSocket 来源。
+// 从 PUBLIC_URL 推导同源 ws(s)://host,可通过 CSP_CONNECT_SRC 追加自定义来源。
+// 当 PUBLIC_URL 未配置且 CSP_CONNECT_SRC 也未配置时,回退到 ws/wss 兜底以保持基本可用性。
+func websocketConnectSrc() string {
+	var entries []string
+	if pub := strings.TrimSpace(os.Getenv("PUBLIC_URL")); pub != "" {
+		if u, err := url.Parse(pub); err == nil && u.Host != "" {
+			scheme := "wss"
+			if u.Scheme == "http" {
+				scheme = "ws"
+			}
+			entries = append(entries, scheme+"://"+u.Host)
+		}
+	}
+	for _, raw := range strings.Split(os.Getenv("CSP_CONNECT_SRC"), ",") {
+		if v := strings.TrimSpace(raw); v != "" {
+			entries = append(entries, v)
+		}
+	}
+	if len(entries) == 0 {
+		return "ws: wss:"
+	}
+	return strings.Join(entries, " ")
+}
 
 func main() {
 	cfg := config.Load()
@@ -58,7 +85,8 @@ func main() {
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("Referrer-Policy", "same-origin")
-		c.Header("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' ws: wss:")
+		csp := "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' " + websocketConnectSrc()
+		c.Header("Content-Security-Policy", csp)
 		c.Next()
 	})
 

@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ConfigProvider, theme } from 'antd'
-import ModernStyle from './components/ModernStyle'
+import CyberStyle from './components/CyberStyle'
 import Login from './pages/Login'
 import MainLayout from './components/MainLayout'
 import Home from './pages/user/Home'
@@ -30,8 +30,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <ConfigProvider theme={{ algorithm: theme.darkAlgorithm }}>
-      <ModernStyle />
+    <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: { colorPrimary: '#00d4ff', borderRadius: 0 } }}>
+      <CyberStyle />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

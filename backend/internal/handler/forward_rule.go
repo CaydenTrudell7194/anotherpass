@@ -52,6 +52,8 @@ func parseID(c *gin.Context) (uint, bool) {
 }
 
 func parseDest(dest string) (addr string, port int) {
+	// 当前 ForwardRule schema 仅支持单一目标地址,因此只取 dest 中第一行有效的 addr:port。
+	// 多行 dest 仅作格式容错,后续行会被忽略;未来如需多目标支持,在此扩展解析逻辑。
 	lines := strings.Split(strings.TrimSpace(dest), "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
