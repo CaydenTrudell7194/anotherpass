@@ -79,7 +79,6 @@ func AdminDashboard(c *gin.Context) {
 }
 
 func ListUsers(c *gin.Context) {
-	actorID := c.GetUint("user_id")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	if page < 1 {
