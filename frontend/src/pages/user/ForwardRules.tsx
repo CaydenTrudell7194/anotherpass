@@ -288,7 +288,6 @@ export default function ForwardRules() {
   ]
 
   const catTabs = [
-    { key: '全部', label: `全部 (${rules.length})` },
     ...categories.map(c => ({
       key: c.name,
       label: `${c.name} (${rules.filter(r => r.category === c.name).length})`,
