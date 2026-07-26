@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ConfigProvider, theme } from 'antd'
+import { createContext, useContext, useState, useEffect } from 'react'
 import CyberStyle from './components/CyberStyle'
 import Login from './pages/Login'
 import MainLayout from './components/MainLayout'
@@ -28,32 +29,65 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+export const ThemeContext = createContext({ isDark: true, toggleTheme: () => {} })
+
 export default function App() {
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('app-theme')
+    return saved === 'light' ? false : true
+  })
+
+  const toggleTheme = () => {
+    setIsDark(prev => {
+      const next = !prev
+      localStorage.setItem('app-theme', next ? 'dark' : 'light')
+      return next
+    })
+  }
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('my-theme-dark')
+      document.documentElement.classList.remove('my-theme-light')
+    } else {
+      document.documentElement.classList.add('my-theme-light')
+      document.documentElement.classList.remove('my-theme-dark')
+    }
+  }, [isDark])
+
   return (
-    <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: { colorPrimary: '#00d4ff', borderRadius: 0 } }}>
-      <CyberStyle />
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-          <Route index element={<Home />} />
-          <Route path="profile" element={<Profile />} />
-          <Route path="forward_rules" element={<ForwardRules />} />
-          <Route path="device_group" element={<MyServers />} />
-          <Route path="node_status" element={<NodeStatus />} />
-          <Route path="plans" element={<Plans />} />
-          <Route path="affiliate" element={<Affiliate />} />
-          <Route path="admin/dashboard" element={<AdminDashboard />} />
-          <Route path="admin/settings" element={<AdminSettings />} />
-          <Route path="admin/users" element={<AdminUsers />} />
-          <Route path="admin/user_groups" element={<AdminUserGroups />} />
-          <Route path="admin/device_groups" element={<AdminDeviceGroups />} />
-          <Route path="admin/plans" element={<AdminPlans />} />
-          <Route path="admin/orders" element={<AdminOrders />} />
-          <Route path="admin/redeem-codes" element={<RedeemCodes />} />
-          <Route path="admin/affiliates" element={<AdminAffiliates />} />
-        </Route>
-      </Routes>
-    </ConfigProvider>
+    <ThemeContext.Provider value={{ isDark, toggleTheme }}>
+      <ConfigProvider theme={{
+        algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        token: {
+          colorPrimary: isDark ? '#00d4ff' : '#1890ff',
+          borderRadius: 4
+        }
+      }}>
+        <CyberStyle isDark={isDark} />
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+            <Route index element={<Home />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="forward_rules" element={<ForwardRules />} />
+            <Route path="device_group" element={<MyServers />} />
+            <Route path="node_status" element={<NodeStatus />} />
+            <Route path="plans" element={<Plans />} />
+            <Route path="affiliate" element={<Affiliate />} />
+            <Route path="admin/dashboard" element={<AdminDashboard />} />
+            <Route path="admin/settings" element={<AdminSettings />} />
+            <Route path="admin/users" element={<AdminUsers />} />
+            <Route path="admin/user_groups" element={<AdminUserGroups />} />
+            <Route path="admin/device_groups" element={<AdminDeviceGroups />} />
+            <Route path="admin/plans" element={<AdminPlans />} />
+            <Route path="admin/orders" element={<AdminOrders />} />
+            <Route path="admin/redeem-codes" element={<RedeemCodes />} />
+            <Route path="admin/affiliates" element={<AdminAffiliates />} />
+          </Route>
+        </Routes>
+      </ConfigProvider>
+    </ThemeContext.Provider>
   )
 }

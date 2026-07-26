@@ -30,6 +30,39 @@ func AdminDashboard(c *gin.Context) {
 	model.DB.Model(&model.ForwardRule{}).Select("COALESCE(SUM(traffic), 0)").Scan(&totalTraffic)
 	model.DB.Model(&model.RechargeOrder{}).Where("status = ?", "paid").Select("COALESCE(SUM(amount_cents), 0)").Scan(&totalRechargeCents)
 
+	// 近 7 天订单流水趋势
+	var orderTrends []gin.H
+	now := time.Now()
+	for i := 6; i >= 0; i-- {
+		d := now.AddDate(0, 0, -i)
+		start := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, d.Location())
+		end := start.AddDate(0, 0, 1)
+
+		var sum int64
+		model.DB.Model(&model.Order{}).
+			Where("status = ? AND created_at >= ? AND created_at < ?", model.OrderStatusApproved, start, end).
+			Select("COALESCE(SUM(paid_cents), 0)").
+			Scan(&sum)
+
+		orderTrends = append(orderTrends, gin.H{
+			"date":         start.Format("2006-01-02"),
+			"amount_cents": sum,
+		})
+	}
+
+	// 流量用量排名前 10 的用户
+	type TrafficUser struct {
+		Username    string `json:"username"`
+		DisplayName string `json:"display_name"`
+		TrafficUsed int64  `json:"traffic_used"`
+	}
+	var topUsers []TrafficUser
+	model.DB.Model(&model.User{}).
+		Order("traffic_used desc").
+		Limit(10).
+		Select("username, display_name, traffic_used").
+		Scan(&topUsers)
+
 	c.JSON(http.StatusOK, gin.H{
 		"user_count":           userCount,
 		"active_user_count":    activeUserCount,
@@ -40,6 +73,8 @@ func AdminDashboard(c *gin.Context) {
 		"total_orders":         orderCount,
 		"approved_orders":      approvedCount,
 		"total_recharge_cents": totalRechargeCents,
+		"order_trends_7d":      orderTrends,
+		"top_traffic_users":    topUsers,
 	})
 }
 

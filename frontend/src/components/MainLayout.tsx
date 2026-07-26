@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Layout, Menu, Button, Dropdown, Avatar, Switch } from 'antd'
 import type { MenuProps } from 'antd'
@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons'
 import { getProfile } from '../api'
 import { useSite, useSiteBackground } from '../site'
+import { ThemeContext } from '../App'
 
 const { Header, Sider, Content } = Layout
 
@@ -49,6 +50,7 @@ export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const { settings } = useSite()
   const background = useSiteBackground()
+  const { isDark, toggleTheme } = useContext(ThemeContext)
 
   useEffect(() => {
     getProfile().then(res => setUser(res.data)).catch(() => {})
@@ -64,13 +66,13 @@ export default function MainLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="dark">
-        <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: collapsed ? 14 : 18, color: '#fff' }}>
+      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme={isDark ? "dark" : "light"}>
+        <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: collapsed ? 14 : 18, color: isDark ? '#fff' : '#1e3a8a' }}>
            {collapsed ? settings.site_name.slice(0, 1) : settings.site_name}
         </div>
         <Menu
           mode="inline"
-          theme="dark"
+          theme={isDark ? "dark" : "light"}
           selectedKeys={[selectedKey]}
           defaultOpenKeys={openKeys}
           items={menuItems(user?.is_admin, settings.allow_user_nodes !== false)}
@@ -78,21 +80,29 @@ export default function MainLayout() {
         />
       </Sider>
       <Layout>
-        <Header style={{ background: 'rgba(0,0,0,0.3)', padding: '0 24px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16 }}>
+        <Header style={{ background: isDark ? 'rgba(5, 5, 8, 0.8)' : 'rgba(255, 255, 255, 0.9)', padding: '0 24px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 'auto' }}>
+            <Switch
+              checkedChildren={<MoonOutlined style={{ color: '#f59e0b' }} />}
+              unCheckedChildren={<SunOutlined style={{ color: '#eab308' }} />}
+              checked={isDark}
+              onChange={toggleTheme}
+            />
+          </div>
           <Dropdown menu={{
             items: [
               { key: 'profile', icon: <UserOutlined />, label: '个人中心', onClick: () => navigate('/profile') },
               { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: handleLogout }
             ]
           }}>
-            <Button type="text" style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#fff' }}>
+            <Button type="text" style={{ display: 'flex', alignItems: 'center', gap: 4, color: isDark ? '#fff' : '#1e3a8a' }}>
               <Avatar size="small" icon={<UserOutlined />} />
               {user?.display_name || user?.username}
             </Button>
           </Dropdown>
         </Header>
         <Content style={{ padding: 24, ...background }}>
-          <div style={settings.theme_policy === 'transparent' ? { background: 'rgba(0,0,0,0.2)', borderRadius: 12, padding: 20, backdropFilter: 'blur(8px)' } : {}}><Outlet /></div>
+          <div style={settings.theme_policy === 'transparent' ? { background: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.6)', borderRadius: 12, padding: 20, backdropFilter: 'blur(8px)' } : {}}><Outlet /></div>
         </Content>
       </Layout>
     </Layout>

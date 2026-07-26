@@ -325,7 +325,7 @@ export default function NodeStatus() {
                 const v6Address = node.ip6 || ''
 
                 return (
-                  <div className={`glass-card node-strip ${node.online ? 'is-online' : 'is-offline'}`} key={node.id}>
+                  <div className={`glass-card node-strip ${node.online ? 'is-online' : 'is-offline'} cyber-dark-node`} key={node.id}>
                     {/* 第一块：状态 glow + IP展示 */}
                     <div className="node-strip__section node-strip__identity">
                       <span className={`status-glow ${node.online ? 'is-online' : ''}`} />
@@ -450,6 +450,35 @@ export default function NodeStatus() {
           --text-primary: #f8fafc;
           --text-secondary: #94a3b8;
           --text-muted: #64748b;
+        }
+
+        /* 暗色模式下节点长条卡片的科技流光改造 */
+        .my-theme-dark .cyber-dark-node {
+          background: rgba(10, 15, 30, 0.95) !important;
+          border: 1px solid rgba(0, 212, 255, 0.25) !important;
+          box-shadow: 0 0 15px rgba(0, 212, 255, 0.05) !important;
+          position: relative;
+          overflow: hidden;
+        }
+        
+        .my-theme-dark .cyber-dark-node::before {
+          content: '';
+          position: absolute;
+          top: 0; left: -150%;
+          width: 50%; height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.15), transparent);
+          transform: skewX(-25deg);
+          transition: 0.75s;
+        }
+        
+        .my-theme-dark .cyber-dark-node:hover::before {
+          left: 150%;
+          transition: 0.75s;
+        }
+        
+        .my-theme-dark .cyber-dark-node:hover {
+          border-color: #ff00ff !important;
+          box-shadow: 0 0 20px rgba(255, 0, 255, 0.2) !important;
         }
 
         .text-rose { color: #f43f5e !important; }
