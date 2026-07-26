@@ -68,7 +68,6 @@ func DefaultSiteSettings() SiteSettings {
 		DefaultCommissionRate: 0.1,
 	}
 }
-}
 
 func LoadSiteSettings() SiteSettings {
 	settings := DefaultSiteSettings()
