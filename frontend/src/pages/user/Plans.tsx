@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, Col, Empty, Form, Input, InputNumber, Modal, Radio, Row, Space, Table, Tag, Typography, message, Statistic } from 'antd'
-import { CheckCircleOutlined, ShoppingCartOutlined, WalletOutlined, SendOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Col, Empty, Form, Input, InputNumber, Modal, Radio, Row, Space, Switch, Table, Tag, Typography, message, Statistic } from 'antd'
+import { CheckCircleOutlined, WalletOutlined, SendOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { createOrder, errorMessage, listOrders, listPlans, getProfile, purchasePlanWithBalance, listRechargeProviders, createRecharge, redeemCode } from '../../api'
+import { errorMessage, listOrders, listPlans, getProfile, purchasePlanWithBalance, listRechargeProviders, createRecharge, redeemCode } from '../../api'
 
 interface Plan {
   id: number
@@ -11,6 +11,7 @@ interface Plan {
   price_cents: number
   duration_days: number
   rule_limit: number
+  traffic_limit: number
   enabled: boolean
 }
 
@@ -40,7 +41,6 @@ export default function Plans() {
   const [plans, setPlans] = useState<Plan[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [form] = Form.useForm()
   const [profile, setProfile] = useState<any>({balance_cents:0})
@@ -106,23 +106,7 @@ export default function Plans() {
 
   useEffect(() => { fetchData() }, [])
 
-  const submitOrder = async () => {
-    if (!selectedPlan) return
-    try {
-      const values = await form.validateFields()
-      setSubmitting(true)
-      await createOrder({ plan_id: selectedPlan.id, user_note: values.user_note || '' })
-      message.success('订单已提交，请等待管理员核实')
-      setSelectedPlan(null)
-      form.resetFields()
-      await fetchData()
-    } catch (err: any) {
-      if (err?.errorFields) return
-      message.error(errorMessage(err, '订单提交失败'))
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  const formatTraffic = (bytes: number) => bytes > 0 ? `${(bytes / (1024**3)).toFixed(0)} GB` : '不限'
 
   const columns = [
     { title: '订单号', dataIndex: 'id', width: 90, render: (id: number) => `#${id}` },
@@ -139,7 +123,7 @@ export default function Plans() {
 
   return <div>
     <Card style={{marginBottom:16}}><Row align="middle" justify="space-between"><Col><Statistic title="账户余额" value={(profile.balance_cents||0)/100} precision={2} prefix="¥" /></Col><Col><Button type="primary" icon={<WalletOutlined />} disabled={!Object.values(providers).some(Boolean)} onClick={()=>{setRechargeKey(crypto.randomUUID());setRechargeOpen(true)}}>充值余额</Button></Col></Row></Card>
-    <Alert type="info" showIcon style={{ marginBottom: 16 }} message="余额购买立即生效" description="余额不足时可通过已配置的支付渠道充值；也可以提交人工审核订单。" />
+    <Alert type="info" showIcon style={{ marginBottom: 16 }} message="余额购买立即生效" description="余额不足时可通过已配置的支付渠道充值。" />
     <Typography.Title level={5} style={{ marginTop: 0 }}>可用套餐</Typography.Title>
     {plans.length === 0 && !loading ? <Empty description="暂无可购买套餐" /> : <Row gutter={[12, 12]}>
       {plans.map(plan => <Col xs={24} sm={12} xl={8} key={plan.id}>
@@ -147,11 +131,12 @@ export default function Plans() {
           <Typography.Paragraph type="secondary" ellipsis={{ rows: 2 }} style={{ minHeight: 44, marginBottom: 12 }}>
             {plan.description || '暂无套餐说明'}
           </Typography.Paragraph>
-          <Space size={16} wrap style={{ marginBottom: 14 }}>
-            <span><CheckCircleOutlined /> {plan.duration_days} 天</span>
-            <span><CheckCircleOutlined /> {plan.rule_limit > 0 ? `${plan.rule_limit} 条规则` : '规则不限'}</span>
+          <Space size={12} wrap style={{ marginBottom: 14 }}>
+            <span><CheckCircleOutlined /> {plan.duration_days}天</span>
+            <span><CheckCircleOutlined /> 规则{plan.rule_limit > 0 ? `${plan.rule_limit}条` : '不限'}</span>
+            <span><CheckCircleOutlined /> 流量{formatTraffic(plan.traffic_limit)}</span>
           </Space>
-          <Space.Compact block><Button type="primary" icon={<WalletOutlined />} style={{width:'60%'}} onClick={() => {setBalancePlan(plan);setPurchaseKey(crypto.randomUUID())}}>余额购买</Button><Button icon={<ShoppingCartOutlined />} style={{width:'40%'}} onClick={() => { setSelectedPlan(plan); form.resetFields() }}>人工申请</Button></Space.Compact>
+          <Button type="primary" block icon={<WalletOutlined />} onClick={() => {setBalancePlan(plan);setPurchaseKey(crypto.randomUUID())}}>余额购买</Button>
         </Card>
       </Col>)}
     </Row>}
@@ -159,25 +144,9 @@ export default function Plans() {
     <Typography.Title level={5} style={{ marginTop: 24 }}>我的订单</Typography.Title>
     <Table rowKey="id" size="small" columns={columns} dataSource={orders} loading={loading} scroll={{ x: 1100 }} pagination={{ pageSize: 10, showSizeChanger: true }} />
 
-    <Modal
-      title={`提交订单${selectedPlan ? ` - ${selectedPlan.name}` : ''}`}
-      open={!!selectedPlan}
-      onCancel={() => setSelectedPlan(null)}
-      onOk={submitOrder}
-      okText="确认提交"
-      cancelText="取消"
-      confirmLoading={submitting}
-      destroyOnClose
-    >
-      {selectedPlan && <Alert type="info" showIcon message={`套餐标价 ${formatPrice(selectedPlan.price_cents)}，当前仅记录订单，不进行在线支付`} style={{ marginBottom: 16 }} />}
-      <Form form={form} layout="vertical" preserve={false}>
-        <Form.Item name="user_note" label="订单备注" rules={[{ max: 500, message: '备注不能超过 500 个字符' }]}>
-          <Input.TextArea rows={4} showCount maxLength={500} placeholder="填写需要管理员了解的信息" />
-        </Form.Item>
-      </Form>
-    </Modal>
     <Modal title={`余额购买 - ${balancePlan?.name||''}`} open={!!balancePlan} onCancel={()=>setBalancePlan(null)} onOk={buyWithBalance} okText="确认购买" confirmLoading={submitting} okButtonProps={{disabled:!!balancePlan&&profile.balance_cents<balancePlan.price_cents}}>
-      {balancePlan && <Alert type={profile.balance_cents>=balancePlan.price_cents?'info':'error'} showIcon message={`价格 ${formatPrice(balancePlan.price_cents)}，当前余额 ${formatPrice(profile.balance_cents||0)}`} description={profile.balance_cents>=balancePlan.price_cents?`购买后余额 ${formatPrice(profile.balance_cents-balancePlan.price_cents)}`:'余额不足，请先充值'} />}
+      {balancePlan && <><Alert type={profile.balance_cents>=balancePlan.price_cents?'info':'error'} showIcon message={`价格 ${formatPrice(balancePlan.price_cents)}，当前余额 ${formatPrice(profile.balance_cents||0)}`} description={profile.balance_cents>=balancePlan.price_cents?`购买后余额 ${formatPrice(profile.balance_cents-balancePlan.price_cents)}`:'余额不足，请先充值'} />
+      {profile.balance_cents>=balancePlan.price_cents && <div style={{marginTop:16}}><Switch defaultChecked /> <Typography.Text style={{marginLeft:8}}>到期自动续费（余额充足时自动扣款续费当前套餐）</Typography.Text></div>}</>}
     </Modal>
     <Modal title="充值余额" open={rechargeOpen} onCancel={()=>setRechargeOpen(false)} onOk={recharge} confirmLoading={submitting}>
       <Form form={rechargeForm} layout="vertical" preserve={false}>
