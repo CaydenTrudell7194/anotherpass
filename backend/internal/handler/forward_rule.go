@@ -235,7 +235,8 @@ func ListCategories(c *gin.Context) {
 		}
 	}
 	if !hasAll {
-		cats = append([]model.RuleCategory{{Name: "全部", SortOrder: -1}}, cats...)
+		model.DB.Create(&model.RuleCategory{UserID: userID, Name: "全部", SortOrder: -1})
+		cats = append([]model.RuleCategory{{UserID: userID, Name: "全部", SortOrder: -1}}, cats...)
 	}
 	c.JSON(http.StatusOK, cats)
 }
@@ -260,6 +261,14 @@ func CreateCategory(c *gin.Context) {
 	model.DB.Model(&model.RuleCategory{}).Where("user_id = ? AND name = ?", userID, input.Name).Count(&count)
 	if count > 0 {
 		c.JSON(http.StatusConflict, gin.H{"error": "分类名称已存在"})
+		return
+	}
+	if input.SortOrder == 0 {
+		var maxSort int
+		model.DB.Model(&model.RuleCategory{}).Where("user_id = ?", userID).Select("COALESCE(MAX(sort_order), 0)").Scan(&maxSort)
+		input.SortOrder = maxSort + 1
+	} else if input.SortOrder < -1000 || input.SortOrder > 1000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "排序值必须在 -1000 到 1000 之间"})
 		return
 	}
 	cat := model.RuleCategory{UserID: userID, Name: input.Name, SortOrder: input.SortOrder}
@@ -587,6 +596,14 @@ func MoveRulesToCategory(c *gin.Context) {
 	if len(input.Category) > 64 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "分类名称不能超过64个字符"})
 		return
+	}
+	if input.Category != "全部" {
+		var count int64
+		model.DB.Model(&model.RuleCategory{}).Where("user_id = ? AND name = ?", userID, input.Category).Count(&count)
+		if count == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "目标分类不存在"})
+			return
+		}
 	}
 	if err := model.DB.Model(&model.ForwardRule{}).Where("id IN ? AND user_id = ?", input.RuleIDs, userID).Update("category", input.Category).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "移动失败"})

@@ -122,7 +122,7 @@ func RecordLoginSuccess(username string) {
 
 func pruneAndCheck(store map[string][]time.Time, key string, cutoff time.Time, threshold int) bool {
 	previous := store[key]
-	recent := previous[:0]
+	recent := make([]time.Time, 0, len(previous))
 	for _, t := range previous {
 		if t.After(cutoff) {
 			recent = append(recent, t)
