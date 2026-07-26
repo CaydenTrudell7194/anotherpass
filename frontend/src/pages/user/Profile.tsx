@@ -43,8 +43,6 @@ export default function Profile() {
         <Descriptions bordered column={{ xs: 1, sm: 2 }} size="small">
           <Descriptions.Item label="用户名">{user?.username}</Descriptions.Item>
           <Descriptions.Item label="显示名">{user?.display_name || '-'}</Descriptions.Item>
-          <Descriptions.Item label="邮箱">{user?.email || '-'}</Descriptions.Item>
-          <Descriptions.Item label="用户组">{user?.group_name || '-'}</Descriptions.Item>
           <Descriptions.Item label="角色">
             <Tag color={user?.is_admin ? 'red' : 'blue'}>{user?.is_admin ? '管理员' : '普通用户'}</Tag>
           </Descriptions.Item>
@@ -60,7 +58,7 @@ export default function Profile() {
       <Card title={<><WalletOutlined /> 余额流水</>} style={{marginBottom:16}}>
         <Table size="small" rowKey="id" pagination={{pageSize:8}} dataSource={ledger} columns={[
           {title:'时间',dataIndex:'created_at',render:(v:string)=>new Date(v).toLocaleString()},
-          {title:'类型',dataIndex:'kind'},
+          {title:'类型',dataIndex:'kind',render:(v:string)=>({'recharge':'充值','order_debit':'套餐扣款','admin_adjustment':'管理员调整'}[v]||v)},
           {title:'变动',dataIndex:'delta_cents',render:(v:number)=><Tag color={v>=0?'green':'red'}>{v>=0?'+':''}¥{(v/100).toFixed(2)}</Tag>},
           {title:'余额',dataIndex:'balance_after_cents',render:(v:number)=>`¥${(v/100).toFixed(2)}`},
           {title:'备注',dataIndex:'note'}

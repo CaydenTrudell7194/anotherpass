@@ -49,11 +49,10 @@ export default function Home() {
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={16}>
           <Card title={<><UserOutlined /> 用户信息</>}>
-            <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
-              <Descriptions.Item label="用户名">{user?.username}</Descriptions.Item>
-              <Descriptions.Item label="显示名">{user?.display_name || '-'}</Descriptions.Item>
-              <Descriptions.Item label="用户组">{user?.group_name || '-'}</Descriptions.Item>
-              <Descriptions.Item label="角色">
+              <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
+                <Descriptions.Item label="用户名">{user?.username}</Descriptions.Item>
+                <Descriptions.Item label="显示名">{user?.display_name || '-'}</Descriptions.Item>
+                <Descriptions.Item label="角色">
                 <Tag color={user?.is_admin ? 'red' : 'blue'}>{user?.is_admin ? '管理员' : '普通用户'}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label="已用流量">{formatBytes(totalTraffic)}</Descriptions.Item>

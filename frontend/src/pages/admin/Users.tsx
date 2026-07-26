@@ -74,6 +74,7 @@ const Users: React.FC = () => {
     setEditingUser(record)
     form.setFieldsValue({
       ...record,
+      traffic_limit_gb: record.traffic_limit / (1024**3),
       expire_at: record.expire_at ? dayjs(record.expire_at) : null,
       status: record.status === 'active',
     })
@@ -96,9 +97,11 @@ const Users: React.FC = () => {
       setSubmitting(true)
       const payload = {
         ...values,
+        traffic_limit: Math.round((values.traffic_limit_gb || 0) * (1024**3)),
         status: values.status ? 'active' : 'disabled',
         expire_at: values.expire_at ? values.expire_at.toISOString() : '0001-01-01T00:00:00Z',
       }
+      delete payload.traffic_limit_gb
       if (editingUser) {
         await updateUser(editingUser.id, payload)
         message.success('更新成功')
@@ -236,8 +239,8 @@ const Users: React.FC = () => {
               ))}
             </Select>
           </Form.Item>
-          <Form.Item name="traffic_limit" label="流量限制 (字节)" tooltip="0 表示不限制">
-            <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+          <Form.Item name="traffic_limit_gb" label="流量限制 (GB)" tooltip="0 表示不限制">
+            <InputNumber min={0} precision={0} style={{ width: '100%' }} addonAfter="GB" />
           </Form.Item>
           <Form.Item name="rule_limit" label="规则数限制" tooltip="0 表示不限制">
             <InputNumber min={0} precision={0} style={{ width: '100%' }} />

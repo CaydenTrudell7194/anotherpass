@@ -14,14 +14,14 @@ import { ThemeContext } from '../App'
 
 const { Header, Sider, Content } = Layout
 
-const menuItems = (isAdmin: boolean, allowUserNodes: boolean): MenuProps['items'] => {
+const menuItems = (isAdmin: boolean, allowUserNodes: boolean, enableAffiliate: boolean): MenuProps['items'] => {
   const items: MenuProps['items'] = [
     { key: '/', icon: <HomeOutlined />, label: '主页' },
     { key: '/profile', icon: <UserOutlined />, label: '个人中心' },
     { key: '/forward_rules', icon: <UnorderedListOutlined />, label: '转发规则' },
     ...(allowUserNodes ? [{ key: '/device_group', icon: <CloudServerOutlined />, label: '单端隧道' }] : []),
     { key: '/node_status', icon: <ApiOutlined />, label: '节点状态' },
-    { key: '/affiliate', icon: <GiftOutlined />, label: '推广返利' },
+    ...(enableAffiliate ? [{ key: '/affiliate', icon: <GiftOutlined />, label: '推广返利' }] : []),
     { key: '/plans', icon: <ShoppingOutlined />, label: '套餐与订单' },
   ]
   if (isAdmin) {
@@ -36,7 +36,7 @@ const menuItems = (isAdmin: boolean, allowUserNodes: boolean): MenuProps['items'
         { key: '/admin/plans', icon: <ShoppingOutlined />, label: '套餐管理' },
         { key: '/admin/orders', icon: <FileDoneOutlined />, label: '订单审核' },
         { key: '/admin/redeem-codes', icon: <DollarOutlined />, label: '兑换码管理' },
-        { key: '/admin/affiliates', icon: <TeamOutlined />, label: '推广管理' },
+        ...(enableAffiliate ? [{ key: '/admin/affiliates', icon: <TeamOutlined />, label: '推广管理' }] : []),
       ],
     } as MenuProps['items'][number])
   }
@@ -75,7 +75,7 @@ export default function MainLayout() {
           theme={isDark ? "dark" : "light"}
           selectedKeys={[selectedKey]}
           defaultOpenKeys={openKeys}
-          items={menuItems(user?.is_admin, settings.allow_user_nodes !== false)}
+          items={menuItems(user?.is_admin, settings.allow_user_nodes !== false, settings.enable_affiliate !== false)}
           onClick={({ key }) => navigate(key)}
         />
       </Sider>

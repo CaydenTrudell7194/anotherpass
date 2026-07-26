@@ -20,19 +20,21 @@ const maxBatchRules = 100
 var errListenPortConflict = errors.New("listen port conflict")
 
 type forwardRuleInput struct {
-	Name       string  `json:"name"`
-	ListenPort int     `json:"listen_port"`
-	TargetAddr string  `json:"target_addr"`
-	TargetPort int     `json:"target_port"`
-	Dest       string  `json:"dest"`
-	Protocol   string  `json:"protocol"`
-	Rate       float64 `json:"rate"`
-	Enabled    *bool   `json:"enabled"`
-	Category   string  `json:"category"`
+	Name          string  `json:"name"`
+	DeviceGroupID uint    `json:"device_group_id"`
+	ListenPort    int     `json:"listen_port"`
+	TargetAddr    string  `json:"target_addr"`
+	TargetPort    int     `json:"target_port"`
+	Dest          string  `json:"dest"`
+	Protocol      string  `json:"protocol"`
+	Rate          float64 `json:"rate"`
+	Enabled       *bool   `json:"enabled"`
+	Category      string  `json:"category"`
 }
 
 type forwardRuleUpdateInput struct {
 	Name       *string  `json:"name"`
+	DeviceGroupID *uint `json:"device_group_id"`
 	ListenPort *int     `json:"listen_port"`
 	TargetAddr *string  `json:"target_addr"`
 	TargetPort *int     `json:"target_port"`
@@ -197,6 +199,7 @@ func inputToRule(input forwardRuleInput, userID uint, now time.Time) model.Forwa
 	return model.ForwardRule{
 		UserID:     userID,
 		Name:       input.Name,
+		DeviceGroupID: input.DeviceGroupID,
 		ListenPort: input.ListenPort,
 		TargetAddr: input.TargetAddr,
 		TargetPort: input.TargetPort,
@@ -411,17 +414,21 @@ func UpdateForwardRule(c *gin.Context) {
 		return
 	}
 	input := forwardRuleInput{
-		Name:       rule.Name,
-		ListenPort: rule.ListenPort,
-		TargetAddr: rule.TargetAddr,
-		TargetPort: rule.TargetPort,
-		Protocol:   rule.Protocol,
-		Rate:       rule.Rate,
-		Enabled:    &rule.Enabled,
-		Category:   rule.Category,
+		Name:          rule.Name,
+		DeviceGroupID: rule.DeviceGroupID,
+		ListenPort:    rule.ListenPort,
+		TargetAddr:    rule.TargetAddr,
+		TargetPort:    rule.TargetPort,
+		Protocol:      rule.Protocol,
+		Rate:          rule.Rate,
+		Enabled:       &rule.Enabled,
+		Category:      rule.Category,
 	}
 	if patch.Name != nil {
 		input.Name = *patch.Name
+	}
+	if patch.DeviceGroupID != nil {
+		input.DeviceGroupID = *patch.DeviceGroupID
 	}
 	if patch.ListenPort != nil {
 		input.ListenPort = *patch.ListenPort
@@ -669,6 +676,20 @@ func BatchToggleForwardRules(c *gin.Context) {
 	model.DB.Model(&model.ForwardRule{}).Where("id IN ? AND user_id = ?", input.RuleIDs, userID).
 		Update("enabled", input.Enabled)
 	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
+}
+
+func BatchClearTraffic(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	var input struct {
+		RuleIDs []uint `json:"rule_ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil || len(input.RuleIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+	model.DB.Model(&model.ForwardRule{}).Where("id IN ? AND user_id = ?", input.RuleIDs, userID).
+		Update("traffic", 0)
+	c.JSON(http.StatusOK, gin.H{"message": "清空成功"})
 }
 
 func DiagnoseForwardRule(c *gin.Context) {
