@@ -40,6 +40,7 @@ type SiteSettings struct {
 	CodepayMerchantId         string  `json:"codepay_merchant_id"`
 	AllowUserNodes            bool    `json:"allow_user_nodes"`
 	DefaultCommissionRate     float64 `json:"default_commission_rate"`
+	EnableAffiliate           bool    `json:"enable_affiliate"`
 }
 
 type PublicSiteInfo struct {
@@ -48,6 +49,7 @@ type PublicSiteInfo struct {
 	SiteNotice          string `json:"site_notice"`
 	AllowRegister       bool   `json:"allow_register"`
 	AllowUserNodes      bool   `json:"allow_user_nodes"`
+	EnableAffiliate     bool   `json:"enable_affiliate"`
 	ThemePolicy         string `json:"theme_policy"`
 	BackgroundURL       string `json:"background_url"`
 	MobileBackgroundURL string `json:"mobile_background_url"`
@@ -65,7 +67,7 @@ func DefaultSiteSettings() SiteSettings {
 		SiteName: "转发面板", SiteSubtitle: "入口直出转发管理平台",
 		RegisterUserGroupID: 1, RegisterRuleLimit: 100, RegisterExpireDays: 365,
 		ThemePolicy: "classic", OfflineNodeSeconds: 90, OfflineNodeRetentionHours: 24,
-		DefaultCommissionRate: 0.1,
+		DefaultCommissionRate: 0.1, EnableAffiliate: true,
 	}
 }
 
@@ -159,6 +161,7 @@ func PublicSiteSettings(c *gin.Context) {
 	settings := LoadSiteSettings()
 	c.JSON(http.StatusOK, PublicSiteInfo{SiteName: settings.SiteName, SiteSubtitle: settings.SiteSubtitle,
 		SiteNotice: settings.SiteNotice, AllowRegister: settings.AllowRegister, AllowUserNodes: settings.AllowUserNodes,
+		EnableAffiliate: settings.EnableAffiliate,
 		ThemePolicy:   settings.ThemePolicy,
 		BackgroundURL: settings.BackgroundURL, MobileBackgroundURL: settings.MobileBackgroundURL})
 }
@@ -201,6 +204,7 @@ func UpdateSiteSettings(c *gin.Context) {
 	settings.CodepayCreateUrl = incoming.CodepayCreateUrl
 	settings.CodepayMerchantId = incoming.CodepayMerchantId
 	settings.DefaultCommissionRate = incoming.DefaultCommissionRate
+	settings.EnableAffiliate = incoming.EnableAffiliate
 
 	if incoming.TelegramBotToken == "" || incoming.TelegramBotToken == "****" {
 		settings.TelegramBotToken = oldToken
@@ -234,6 +238,7 @@ type RegisterReq struct {
 	Username    string `json:"username" binding:"required"`
 	Password    string `json:"password" binding:"required"`
 	DisplayName string `json:"display_name"`
+	ReferredBy  string `json:"referred_by"`
 }
 
 func Register(c *gin.Context) {
@@ -272,16 +277,36 @@ func Register(c *gin.Context) {
 	now := time.Now()
 	user := model.User{Username: req.Username, Password: string(hash), DisplayName: req.DisplayName,
 		UserGroupID: settings.RegisterUserGroupID, Status: "active",
-		RuleLimit: settings.RegisterRuleLimit, ExpireAt: now.AddDate(0, 0, settings.RegisterExpireDays), CreatedAt: now, UpdatedAt: now}
+		RuleLimit: settings.RegisterRuleLimit, ExpireAt: now.AddDate(0, 0, settings.RegisterExpireDays),
+		ReferredBy: strings.ToUpper(strings.TrimSpace(req.ReferredBy)),
+		CreatedAt: now, UpdatedAt: now}
 	if err := model.DB.Transaction(func(tx *gorm.DB) error {
 		var group model.UserGroup
 		if err := tx.First(&group, settings.RegisterUserGroupID).Error; err != nil {
 			return err
 		}
+		if user.ReferredBy != "" {
+			var referrer model.Affiliate
+			if err := tx.Where("code = ?", user.ReferredBy).First(&referrer).Error; err == nil {
+				user.ReferredBy = referrer.Code
+			} else {
+				user.ReferredBy = ""
+			}
+		}
 		return tx.Create(&user).Error
 	}); err != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "用户名已存在"})
 		return
+	}
+	// 若用户是通过邀请码注册，记录返利关系
+	if user.ReferredBy != "" {
+		var referrer model.Affiliate
+		if err := model.DB.Where("code = ?", user.ReferredBy).First(&referrer).Error; err == nil {
+			model.DB.Create(&model.AffLog{
+				ReferrerID: referrer.UserID, ReferredID: user.ID,
+				AmountCents: 0, CommissionCents: 0, CreatedAt: time.Now(),
+			})
+		}
 	}
 	c.JSON(http.StatusCreated, gin.H{"message": "注册成功"})
 }

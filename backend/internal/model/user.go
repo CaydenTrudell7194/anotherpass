@@ -7,7 +7,7 @@ type User struct {
 	Username     string    `gorm:"uniqueIndex;size:64" json:"username"`
 	Password     string    `gorm:"size:256" json:"-"`
 	DisplayName  string    `gorm:"size:64" json:"display_name"`
-	UserGroupID  uint      `gorm:"default:1" json:"user_group_id"`
+	UserGroupID  uint      `gorm:"default:1" json:"-"`
 	Status       string    `gorm:"default:active;size:16" json:"status"`
 	TrafficLimit int64     `gorm:"default:0" json:"traffic_limit"`
 	TrafficUsed  int64     `gorm:"default:0" json:"traffic_used"`
@@ -16,6 +16,8 @@ type User struct {
 	IsAdmin      bool      `gorm:"default:false" json:"is_admin"`
 	TokenVersion uint      `gorm:"default:1" json:"-"`
 	BalanceCents int64     `gorm:"not null;default:0" json:"balance_cents"`
+	AutoRenew    bool      `gorm:"default:false" json:"auto_renew"`
+	ReferredBy   string    `gorm:"size:8" json:"-"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

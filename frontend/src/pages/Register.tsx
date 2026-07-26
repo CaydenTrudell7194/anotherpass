@@ -152,13 +152,19 @@ export default function Register() {
   const submit = async (values: any) => {
     if (values.password !== values.confirm) return message.error('两次输入的密码不一致')
     try {
-      await register({ username: values.username, password: values.password, display_name: values.display_name })
+      const payload: any = { username: values.username, password: values.password, display_name: values.display_name }
+      if (values.referred_by) payload.referred_by = values.referred_by
+      await register(payload)
       message.success('注册成功，请登录')
       navigate('/login')
     } catch (err) {
       message.error(errorMessage(err, '注册失败'))
     }
   }
+
+  // 从 URL 参数中读取邀请码
+  const params = new URLSearchParams(window.location.search)
+  const inviteCode = params.get('ref') || ''
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
@@ -171,6 +177,9 @@ export default function Register() {
           <Form.Item name="display_name" label={<span style={{ color: 'rgba(0, 212, 255, 0.8)' }}>显示名</span>} rules={[{ max: 64 }]}><Input /></Form.Item>
           <Form.Item name="password" label={<span style={{ color: 'rgba(0, 212, 255, 0.8)' }}>密码</span>} rules={[{ required: true, min: 8, message: '密码至少8位' }]}><Input.Password prefix={<LockOutlined />} /></Form.Item>
           <Form.Item name="confirm" label={<span style={{ color: 'rgba(0, 212, 255, 0.8)' }}>确认密码</span>} rules={[{ required: true }]}><Input.Password prefix={<LockOutlined />} /></Form.Item>
+          {settings.enable_affiliate !== false && <Form.Item name="referred_by" label={<span style={{ color: 'rgba(0, 212, 255, 0.8)' }}>邀请码</span>} initialValue={inviteCode}>
+            <Input placeholder="选填，邀请人推广码" readOnly={!!inviteCode} />
+          </Form.Item>}
           <Button type="primary" htmlType="submit" icon={<UserAddOutlined />} block>注册</Button>
         </Form>
         <div style={{ textAlign: 'center', marginTop: 16 }}>

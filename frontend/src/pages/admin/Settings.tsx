@@ -84,7 +84,8 @@ export default function Settings() {
           <Form.Item name="allow_user_nodes" label="允许用户使用单端隧道" valuePropName="checked" extra="关闭后用户菜单隐藏'单端隧道'，且API拒绝创建新节点"><Switch /></Form.Item>
         </Card>
         <Card title="推广返利" style={{ marginBottom: 16 }}>
-          <Form.Item name="default_commission_rate" label="默认佣金比例" extra="新用户创建推广码时的默认比例，单用户可在管理界面单独调整"><InputNumber min={0} max={1} step={0.01} style={{ width: 120 }} addonAfter="倍" /></Form.Item>
+          <Form.Item name="enable_affiliate" label="启用推广返利" valuePropName="checked" extra="关闭后注册页面隐藏邀请码输入框"><Switch /></Form.Item>
+          <Form.Item name="default_commission_rate" label="默认佣金比例" extra="新用户创建推广码时的默认比例"><InputNumber min={0} max={1} step={0.01} style={{ width: 120 }} addonAfter="倍" /></Form.Item>
         </Card>
         <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={saving} size="large">保存全部设置</Button>
       </Form>

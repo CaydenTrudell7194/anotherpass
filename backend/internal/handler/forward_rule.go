@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"math"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -356,6 +357,12 @@ func CreateForwardRule(c *gin.Context) {
 		return
 	}
 	rule := inputToRule(input, userID, time.Now())
+	if rule.Enabled {
+		if ok, msg := CheckUserRuleQuota(userID); !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": msg})
+			return
+		}
+	}
 	err := model.DB.Transaction(func(tx *gorm.DB) error {
 		if err := checkRuleLimit(tx, userID, 1); err != nil {
 			return err
@@ -509,6 +516,12 @@ func ToggleForwardRule(c *gin.Context) {
 		return
 	}
 	rule.Enabled = !rule.Enabled
+	if rule.Enabled {
+		if ok, msg := CheckUserRuleQuota(rule.UserID); !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": msg})
+			return
+		}
+	}
 	err := model.DB.Transaction(func(tx *gorm.DB) error {
 		if rule.Enabled {
 			if err := checkListenPortConflict(tx, rule.UserID, rule.Protocol, rule.ListenPort, rule.ID); err != nil {
@@ -611,3 +624,69 @@ func MoveRulesToCategory(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "移动成功"})
 }
+
+func DuplicateForwardRule(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	var original model.ForwardRule
+	if err := model.DB.Where("id = ? AND user_id = ?", id, userID).First(&original).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "规则不存在"})
+		return
+	}
+	dup := model.ForwardRule{
+		UserID:        userID, Name: original.Name + " (副本)", DeviceGroupID: original.DeviceGroupID,
+		ListenPort: original.ListenPort, TargetAddr: original.TargetAddr, TargetPort: original.TargetPort,
+		Protocol: original.Protocol, Rate: original.Rate, Enabled: false,
+		Category: original.Category, Status: "active",
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	if err := model.DB.Create(&dup).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "复制失败"})
+		return
+	}
+	c.JSON(http.StatusOK, dup)
+}
+
+func BatchToggleForwardRules(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	var input struct {
+		RuleIDs []uint `json:"rule_ids" binding:"required"`
+		Enabled bool   `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil || len(input.RuleIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+	if input.Enabled {
+		if ok, msg := CheckUserRuleQuota(userID); !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": msg})
+			return
+		}
+	}
+	model.DB.Model(&model.ForwardRule{}).Where("id IN ? AND user_id = ?", input.RuleIDs, userID).
+		Update("enabled", input.Enabled)
+	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
+}
+
+func DiagnoseForwardRule(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	var rule model.ForwardRule
+	if err := model.DB.Where("id = ? AND user_id = ?", id, userID).First(&rule).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "规则不存在"})
+		return
+	}
+	// 简单的 TCP 连通性诊断
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(rule.TargetAddr, strconv.Itoa(rule.TargetPort)), 5*time.Second)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"reachable": false, "error": err.Error()})
+		return
+	}
+	conn.Close()
+	c.JSON(http.StatusOK, gin.H{"reachable": true})

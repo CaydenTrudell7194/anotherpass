@@ -10,6 +10,7 @@ interface AffiliateInfo {
   total_earned_cents: number
   commission_rate: number
   referral_count: number
+  invite_link?: string
 }
 
 const Affiliate: React.FC = () => {
@@ -24,11 +25,11 @@ const Affiliate: React.FC = () => {
       .finally(() => setLoading(false))
   }, [])
 
-  const handleCopy = () => {
-    if (info?.code) {
-      navigator.clipboard.writeText(info.code)
-      message.success('已复制推广码')
-    }
+  const inviteUrl = info?.code ? `${window.location.origin}/register?ref=${info.code}` : ''
+
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text)
+    message.success(`已复制${label}`)
   }
 
   if (loading) return <Spin size="large" style={{ display: 'flex', justifyContent: 'center', marginTop: 120 }} />
@@ -38,16 +39,29 @@ const Affiliate: React.FC = () => {
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
       <Row gutter={[16, 16]}>
         <Col span={24}>
-          <Card title={<><GiftOutlined /> 推广返利</>}>
-            <div style={{ marginBottom: 24 }}>
+      <Card title={<><GiftOutlined /> 推广返利</>}>
+            <div style={{ marginBottom: 16 }}>
               <Text strong>我的推广码：</Text>
               <Input.Search
                 value={info.code}
                 readOnly
                 enterButton={<><CopyOutlined /> 复制</>}
-                onSearch={handleCopy}
+                onSearch={() => handleCopy(info.code, '推广码')}
                 style={{ width: 300, marginLeft: 12 }}
               />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <Text strong>推广链接：</Text>
+              <Input.Search
+                value={inviteUrl}
+                readOnly
+                enterButton={<><CopyOutlined /> 复制</>}
+                onSearch={() => handleCopy(inviteUrl, '推广链接')}
+                style={{ width: '100%', marginLeft: 12 }}
+              />
+              <div style={{ fontSize: 12, color: '#999', marginTop: 4, marginLeft: 12 }}>
+                用户通过此链接注册将自动填写您的推广码
+              </div>
             </div>
             <Row gutter={16}>
               <Col span={12}>

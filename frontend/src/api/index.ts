@@ -41,6 +41,9 @@ export const deleteForwardRule = (id: number) => api.delete(`/forward_rules/${id
 export const toggleForwardRule = (id: number) => api.put(`/forward_rules/${id}/toggle`)
 export const batchCreateRules = (rules: any[]) => api.post('/forward_rules/batch', rules)
 export const moveRulesToCategory = (ruleIds: number[], category: string) => api.post('/forward_rules/move', { rule_ids: ruleIds, category })
+export const duplicateForwardRule = (id: number) => api.post(`/forward_rules/${id}/duplicate`)
+export const diagnoseForwardRule = (id: number) => api.post(`/forward_rules/${id}/diagnose`)
+export const batchToggleForwardRules = (ruleIds: number[], enabled: boolean) => api.post('/forward_rules/batch-toggle', { rule_ids: ruleIds, enabled })
 
 // Category APIs
 export const listCategories = () => api.get('/forward_rules/categories')

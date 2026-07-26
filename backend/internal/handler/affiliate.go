@@ -39,7 +39,7 @@ func GetAffiliateInfo(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询推广统计失败"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"code": aff.Code, "commission_rate": aff.CommissionRate, "total_earned_cents": aff.TotalEarnedCents, "referral_count": referralCount})
+	c.JSON(http.StatusOK, gin.H{"code": aff.Code, "commission_rate": aff.CommissionRate, "total_earned_cents": aff.TotalEarnedCents, "referral_count": referralCount, "invite_link": ""})
 }
 
 func AdminListAffiliates(c *gin.Context) {

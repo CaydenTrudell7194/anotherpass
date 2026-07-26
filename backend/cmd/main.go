@@ -67,11 +67,12 @@ func main() {
 		log.Fatalf("初始化默认数据失败: %v", err)
 	}
 
-	// 节点离线检测
+	// 节点离线检测 + 用户配额检查
 	go func() {
 		for {
 			handler.CheckOfflineNodes()
-			time.Sleep(10 * time.Second)
+			handler.EnforceUserQuotas()
+			time.Sleep(30 * time.Second)
 		}
 	}()
 
@@ -132,6 +133,9 @@ auth.GET("/forward_rules", handler.ListForwardRules)
 		auth.PUT("/forward_rules/:id/toggle", handler.ToggleForwardRule)
 		auth.POST("/forward_rules/batch", handler.BatchCreateForwardRules)
 		auth.POST("/forward_rules/move", handler.MoveRulesToCategory)
+		auth.POST("/forward_rules/:id/duplicate", handler.DuplicateForwardRule)
+		auth.POST("/forward_rules/:id/diagnose", handler.DiagnoseForwardRule)
+		auth.POST("/forward_rules/batch-toggle", handler.BatchToggleForwardRules)
 		auth.GET("/forward_rules/categories", handler.ListCategories)
 		auth.POST("/forward_rules/categories", handler.CreateCategory)
 		auth.PUT("/forward_rules/categories/:cid", handler.UpdateCategory)
