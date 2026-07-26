@@ -124,6 +124,33 @@ func validateForwardRule(input *forwardRuleInput) string {
 	return ""
 }
 
+func authorizeDeviceGroup(userID, groupID uint, isAdmin bool) error {
+	var group model.DeviceGroup
+	if err := model.DB.First(&group, groupID).Error; err != nil {
+		return err
+	}
+	if isAdmin {
+		return nil
+	}
+	if group.Type != model.DeviceGroupEntryForceDirect && group.Type != model.DeviceGroupEntryOptionalDirect {
+		return gorm.ErrRecordNotFound
+	}
+	var user model.User
+	if err := model.DB.First(&user, userID).Error; err != nil {
+		return err
+	}
+	if group.UserGroupIDs == "" {
+		return nil
+	}
+	wanted := strconv.FormatUint(uint64(user.UserGroupID), 10)
+	for _, id := range strings.Split(group.UserGroupIDs, ",") {
+		if strings.TrimSpace(id) == wanted {
+			return nil
+		}
+	}
+	return gorm.ErrRecordNotFound
+}
+
 func checkRuleLimit(db *gorm.DB, userID uint, additional int) error {
 	var user model.User
 	if err := db.First(&user, userID).Error; err != nil {
