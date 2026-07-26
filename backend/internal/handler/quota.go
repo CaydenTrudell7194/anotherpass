@@ -14,14 +14,11 @@ func EnforceUserQuotas() {
 	model.DB.Where("status = ?", "active").Find(&users)
 	for _, u := range users {
 		quotaExhausted := false
-		reason := ""
 		if !u.ExpireAt.IsZero() && now.After(u.ExpireAt) {
 			quotaExhausted = true
-			reason = "套餐已到期"
 		}
 		if u.TrafficLimit > 0 && u.TrafficUsed >= u.TrafficLimit {
 			quotaExhausted = true
-			reason = "流量已用尽"
 		}
 		if quotaExhausted {
 			// 停用该用户所有已启用规则
