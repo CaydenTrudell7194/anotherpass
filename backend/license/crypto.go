@@ -2,6 +2,7 @@ package license
 
 /*
 #cgo LDFLAGS: -lcrypto
+#include <stdlib.h>
 #include "crypto.h"
 */
 import "C"
