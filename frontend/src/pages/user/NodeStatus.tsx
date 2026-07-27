@@ -221,7 +221,7 @@ export default function NodeStatus() {
         <div className={`glass-monitor__status-badge is-${connection}`}>
           {connection === 'connected' ? <WifiOutlined className="pulse-icon" /> : <DisconnectOutlined />}
           <span>
-            {connection === 'connected' ? '已连接 · 1S 实时更新' : connection === 'connecting' ? '正在连接...' : '连接中断 · 3S 后重连'}
+            {connection === 'connected' ? '已连接 · 3S 实时更新' : connection === 'connecting' ? '正在连接...' : '连接中断 · 3S 后重连'}
           </span>
         </div>
       </header>

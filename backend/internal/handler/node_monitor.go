@@ -106,7 +106,7 @@ func NodeMonitorWebSocket(c *gin.Context) {
 		return
 	}
 	defer conn.Close()
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 	groups, nodes, userNodes := loadMonitorScope(ticket.GroupIDs, ticket.UserID, ticket.IsAdmin)
 	ticks := 0
@@ -171,7 +171,7 @@ func buildMonitorSnapshot(groups []model.DeviceGroup, nodes []model.Node, userNo
 	for _, node := range nodes {
 		entry := nodeMonitorCache.items[node.ID]
 		lastUpdate := entry.UpdatedAt
-		online := node.Status == "online" && (!lastUpdate.IsZero() && now.Sub(lastUpdate) < 5*time.Second || lastUpdate.IsZero() && now.Sub(node.LastHeartbeat) < 20*time.Second)
+		online := node.Status == "online" && (!lastUpdate.IsZero() && now.Sub(lastUpdate) < 15*time.Second || lastUpdate.IsZero() && now.Sub(node.LastHeartbeat) < 60*time.Second)
 		ip4Geo, ip6Geo := lookupNodeGeo(node.IP4, node.IP6, seenIPs)
 		view := monitorNodeView{
 			ID: node.ID, DeviceGroupID: node.DeviceGroupID, Name: node.Name,
@@ -202,7 +202,7 @@ func buildMonitorSnapshot(groups []model.DeviceGroup, nodes []model.Node, userNo
 	for _, un := range userNodes {
 		entry := userNodeMonitorCache.items[un.ID]
 		lastUpdate := entry.UpdatedAt
-		online := un.Status == "online" && (!lastUpdate.IsZero() && now.Sub(lastUpdate) < 5*time.Second || lastUpdate.IsZero() && now.Sub(un.LastHeartbeat) < 20*time.Second)
+		online := un.Status == "online" && (!lastUpdate.IsZero() && now.Sub(lastUpdate) < 15*time.Second || lastUpdate.IsZero() && now.Sub(un.LastHeartbeat) < 60*time.Second)
 		ip4Geo, ip6Geo := lookupNodeGeo(un.IP4, un.IP6, seenIPs)
 		uview := monitorNodeView{
 			ID: un.ID, Name: un.Name, IP: un.IP,
