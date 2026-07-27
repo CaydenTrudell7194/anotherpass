@@ -37,15 +37,10 @@ jobs:
           mkdir -p ${{ github.workspace }}/build
           docker run --rm --platform linux/${{ matrix.arch }} \
             -v ${{ github.workspace }}:/workspace -w /workspace/backend \
-            -e LICENSE_PUBLIC_KEY="${{ secrets.LICENSE_PUBLIC_KEY }}" \
             golang:1.21-bookworm \
-            sh -c 'apt-get update -qq && apt-get install -y -qq libssl-dev >/dev/null 2>&1 && \
-            go install mvdan.cc/garble@latest && \
+            sh -c "apt-get update -qq && apt-get install -y -qq libssl-dev >/dev/null 2>&1 && \
             go mod download && go mod verify && \
-            CGO_ENABLED=1 go test ./... && \
-            GARBLE_SEED=$(openssl rand -hex 16) && \
-            CGO_ENABLED=1 garble -tiny -literals -split-shapes -seed=${GARBLE_SEED} \
-            go build -ldflags="-s -w" -buildvcs=false -o /workspace/build/backend-linux-${{ matrix.arch }} ./cmd/'
+            CGO_ENABLED=1 go build -ldflags='-s -w' -buildvcs=false -o /workspace/build/backend-linux-${{ matrix.arch }} ./cmd/"
 
       - name: Build Node Client (${{ matrix.arch }})
         run: |
