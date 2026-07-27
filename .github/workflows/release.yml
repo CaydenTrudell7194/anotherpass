@@ -36,11 +36,8 @@ jobs:
         run: |
           mkdir -p ${{ github.workspace }}/build
           docker run --rm --platform linux/${{ matrix.arch }} \
-            -v ${{ github.workspace }}:/workspace -w /workspace/backend \
-            golang:1.21-bookworm \
-            sh -c "apt-get update -qq && apt-get install -y -qq libssl-dev >/dev/null 2>&1 && \
-            go mod download && go mod verify && \
-            CGO_ENABLED=1 go build -ldflags='-s -w' -buildvcs=false -o /workspace/build/backend-linux-${{ matrix.arch }} ./cmd/"
+            -v ${{ github.workspace }}:/workspace -w /workspace/backend golang:1.21-bookworm \
+            sh -c "go mod download && go mod verify && CGO_ENABLED=1 go test ./... && CGO_ENABLED=1 go build -buildvcs=false -o /workspace/build/backend-linux-${{ matrix.arch }} ./cmd/"
 
       - name: Build Node Client (${{ matrix.arch }})
         run: |

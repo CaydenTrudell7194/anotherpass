@@ -14,7 +14,6 @@ import (
 	"forward-panel/internal/handler"
 	"forward-panel/internal/middleware"
 	"forward-panel/internal/model"
-	"forward-panel/license"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -53,22 +52,6 @@ func main() {
 	handler.ConfigurePayments(cfg)
 	if err := middleware.ConfigureJWTSecret(); err != nil {
 		log.Fatalf("安全配置错误: %v", err)
-	}
-
-	// 授权验证
-	lic := license.New(license.Config{
-		ServerURL:  strings.TrimSpace(os.Getenv("LICENSE_SERVER")),
-		LicenseKey: strings.TrimSpace(os.Getenv("LICENSE_KEY")),
-		Domain:     strings.TrimSpace(os.Getenv("LICENSE_DOMAIN")),
-		PublicKey:  strings.TrimSpace(os.Getenv("LICENSE_PUBLIC_KEY")),
-	})
-	// 仅在设置了 LICENSE_SERVER 时启用授权检查（兼容开发模式）
-	if lic.ServerURL != "" {
-		if err := lic.Verify(); err != nil {
-			log.Fatalf("授权验证失败: %v", err)
-		}
-		log.Printf("授权验证通过，域名: %s", lic.Domain)
-		lic.StartHeartbeat()
 	}
 
 	dsn := cfg.Database
