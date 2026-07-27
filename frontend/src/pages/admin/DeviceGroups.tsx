@@ -9,6 +9,8 @@ interface DeviceGroup {
   user_group_ids: string
   type: string
   connection_addr: string
+  port_min: number
+  port_max: number
   rate: number
   traffic_used: number
   online_devices: number
@@ -140,6 +142,7 @@ const DeviceGroups: React.FC = () => {
       render: (type: string) => TYPE_LABELS[type] || type,
     },
     { title: '连接地址', dataIndex: 'connection_addr', key: 'connection_addr', render: (val: string) => val || '-' },
+    { title: '端口范围', key: 'port_range', render: (_: any, r: DeviceGroup) => `${r.port_min||1}-${r.port_max||65535}` },
     { title: '倍率', dataIndex: 'rate', key: 'rate', render: (val: number) => (val ?? 1) },
     {
       title: '已用流量',
@@ -236,6 +239,14 @@ const DeviceGroups: React.FC = () => {
           <Form.Item name="rate" label="倍率" initialValue={1}>
             <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
           </Form.Item>
+          <Space size={12} style={{ display: 'flex' }}>
+            <Form.Item name="port_min" label="端口起始" initialValue={1} style={{ flex: 1 }}>
+              <InputNumber min={1} max={65535} precision={0} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="port_max" label="端口结束" initialValue={65535} style={{ flex: 1 }}>
+              <InputNumber min={1} max={65535} precision={0} style={{ width: '100%' }} />
+            </Form.Item>
+          </Space>
           <Form.Item name="sort_order" label="排序" initialValue={0}>
             <InputNumber precision={0} style={{ width: '100%' }} />
           </Form.Item>

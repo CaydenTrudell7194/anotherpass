@@ -359,6 +359,15 @@ func CreateForwardRule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": msg})
 		return
 	}
+	// 监听端口留空时从设备组端口范围自动分配
+	if input.ListenPort == 0 {
+		port, err := assignAvailablePort(input.DeviceGroupID, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		input.ListenPort = port
+	}
 	rule := inputToRule(input, userID, time.Now())
 	if rule.Enabled {
 		if ok, msg := CheckUserRuleQuota(userID); !ok {
@@ -711,4 +720,32 @@ func DiagnoseForwardRule(c *gin.Context) {
 	}
 	conn.Close()
 	c.JSON(http.StatusOK, gin.H{"reachable": true})
+}
+
+// assignAvailablePort 从设备组的端口范围中自动分配一个未被使用的端口
+func assignAvailablePort(deviceGroupID, userID uint) (int, error) {
+	var group model.DeviceGroup
+	if err := model.DB.First(&group, deviceGroupID).Error; err != nil {
+		return 0, errors.New("设备组不存在")
+	}
+	portMin := group.PortMin
+	portMax := group.PortMax
+	if portMin < 1 {
+		portMin = 1
+	}
+	if portMax < portMin || portMax > 65535 {
+		portMax = 65535
+	}
+
+	// 尝试从端口范围中找一个未被该用户和其他用户占用的端口
+	for port := portMin; port <= portMax; port++ {
+		var count int64
+		model.DB.Model(&model.ForwardRule{}).
+			Where("(user_id = ? OR device_group_id = ?) AND listen_port = ? AND enabled = ?", userID, deviceGroupID, port, true).
+			Count(&count)
+		if count == 0 {
+			return port, nil
+		}
+	}
+	return 0, errors.New("设备组端口范围内无可用端口")
 }

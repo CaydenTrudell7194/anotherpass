@@ -17,6 +17,8 @@ type DeviceGroup struct {
 	Type           DeviceGroupType `gorm:"size:32;default:entry" json:"type"`
 	UserGroupIDs   string          `gorm:"size:256" json:"user_group_ids"`
 	ConnectionAddr string          `gorm:"size:256" json:"connection_addr"`
+	PortMin        int             `gorm:"default:1" json:"port_min"`
+	PortMax        int             `gorm:"default:65535" json:"port_max"`
 	Rate           float64         `gorm:"default:1" json:"rate"`
 	HideInProbe    bool            `gorm:"default:false" json:"hide_in_probe"`
 	Notes          string          `gorm:"size:512" json:"notes"`
